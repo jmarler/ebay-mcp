@@ -94,6 +94,11 @@ export class EbayApiClient {
 
     if (this.config.contentLanguage) {
       headers['Content-Language'] = this.config.contentLanguage;
+      // The Sell Inventory API rejects requests whose Accept-Language it can't
+      // resolve (HTTP 400, errorId 25709). Node's fetch does not send an
+      // acceptable value, so set it explicitly to the configured language.
+      // Per-call headers still override this default (e.g. metadata locale calls).
+      headers['Accept-Language'] = this.config.contentLanguage;
     }
 
     if (this.config.marketplaceId) {
