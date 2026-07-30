@@ -64,31 +64,40 @@ const firstEbayErrorMessage = (errors: unknown[]): string | undefined => {
   return typeof detail === 'string' ? detail : undefined;
 };
 
-/**
- * Flatten an eBay tagged-error cause chain into the detail a tool result should
- * surface. Walks `.cause` from the outermost error inward, collecting the best
- * message, the HTTP status, and the raw eBay `errors` array (which carries
- * `errorId` and `parameters`) so failures are no longer masked as a generic string.
- *
- * @param error - The value caught at the MCP tool boundary (typed `unknown`).
- * @returns Message, optional status, and optional raw eBay errors array.
- *
- * @example
- * ```ts
- * const { message, status, errors } = getEbayErrorDetails(error);
- * ```
- */
 /** Mutable accumulator threaded through the cause chain by {@link getEbayErrorDetails}. */
 interface EbayErrorAccumulator {
   message: string;
   status?: number;
   errors?: unknown[];
+  /** Set once a composed remediation message is captured so raw detail cannot overwrite it. */
+  messageLocked?: boolean;
 }
+
+/**
+ * `EbayClientRequestError.kind` values whose message is deliberate, actionable
+ * remediation guidance (retry-after seconds, "use the ebay_set_user_tokens…"
+ * hint). A deeper node's raw eBay `longMessage` must not overwrite these — the
+ * generic `httpStatus`/`transport` messages, by contrast, are refined by the
+ * eBay error detail and stay overwritable.
+ */
+const GUIDANCE_KINDS = new Set([
+  'missingCredentials',
+  'localRateLimit',
+  'tokenAcquisition',
+  'missingAccessToken',
+  'tokenRefresh',
+  'remoteRateLimit',
+]);
 
 /** Fold one cause-chain node's message, status, and eBay errors into the accumulator. */
 const collectEbayErrorNode = (node: Record<string, unknown>, acc: EbayErrorAccumulator): void => {
-  if (typeof node.message === 'string' && node.message.length > 0) {
-    acc.message = node.message;
+  const message =
+    typeof node.message === 'string' && node.message.length > 0 ? node.message : undefined;
+  if (message !== undefined && !acc.messageLocked) {
+    acc.message = message;
+    if (typeof node.kind === 'string' && GUIDANCE_KINDS.has(node.kind)) {
+      acc.messageLocked = true;
+    }
   }
   if (typeof node.status === 'number') {
     acc.status = node.status;
@@ -98,12 +107,37 @@ const collectEbayErrorNode = (node: Record<string, unknown>, acc: EbayErrorAccum
   if (data && Array.isArray(data.errors)) {
     acc.errors = data.errors;
     const detail = firstEbayErrorMessage(data.errors);
-    if (detail) {
+    if (detail && !acc.messageLocked) {
       acc.message = detail;
     }
+    return;
+  }
+  // eBay Trading (XML) errors ride on the tagged-error `cause` as an array of
+  // `{ ShortMessage, LongMessage, ErrorCode, ErrorParameters }` rather than
+  // `data.errors`. Surface it verbatim so Trading failures carry the same
+  // structured detail (errorId/parameters) as REST failures. The human-readable
+  // message is already captured from the TradingApiFailure `message` field above.
+  if (acc.errors === undefined && Array.isArray(node.cause) && node.cause.length > 0) {
+    acc.errors = node.cause;
   }
 };
 
+/**
+ * Flatten an eBay tagged-error cause chain into the detail a tool result should
+ * surface. Walks `.cause` from the outermost error inward, collecting the best
+ * message, the HTTP status, and the raw eBay `errors` array (which carries
+ * `errorId` and `parameters`) so failures are no longer masked as a generic string.
+ * A composed remediation message (rate-limit retry hint, token guidance) is kept
+ * intact rather than being overwritten by a deeper raw eBay message.
+ *
+ * @param error - The value caught at the MCP tool boundary (typed `unknown`).
+ * @returns Message, optional status, and optional raw eBay errors array.
+ *
+ * @example
+ * ```ts
+ * const { message, status, errors } = getEbayErrorDetails(error);
+ * ```
+ */
 export const getEbayErrorDetails = (error: unknown): EbayErrorDetails => {
   const acc: EbayErrorAccumulator = { message: getErrorMessage(error) };
 
