@@ -17,7 +17,8 @@ import {
 export const analyticsEntries: ToolEntry[] = [
   defineTool({
     name: 'ebay_get_traffic_report',
-    description: 'Get traffic report for listings',
+    description:
+      'Get a listings traffic report (impressions, click-through rate, sales conversion).\n\nREQUIRED params: dimension (DAY or LISTING), filter (must include marketplace_ids and date_range, e.g. "marketplace_ids:{EBAY_US},date_range:[20260701..20260731]"), and metric (comma-delimited, e.g. "LISTING_IMPRESSION_TOTAL,CLICK_THROUGH_RATE").\n\nThe optional `sort` must be one of the METRIC names (optionally prefixed with "-" for descending) — NOT a dimension. For example sort:"DAY" is invalid; use sort:"LISTING_IMPRESSION_TOTAL".\n\nRequired: User OAuth token.',
     inputSchema: getTrafficReportInputSchema.shape,
     outputSchema: {
       type: 'object',

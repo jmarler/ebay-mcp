@@ -17,7 +17,7 @@ export const tradingEntries: ToolEntry[] = [
   defineTool({
     name: 'ebay_get_active_listings',
     description:
-      'Get all active fixed-price listings with SKU, quantity, price, and watch count.\n\nUses the Trading API (GetMyeBaySelling). Returns listings created via any method (UI, Trading API, or REST API).\n\nRequired: User OAuth token.',
+      'Get active fixed-price listings.\n\nUses the Trading API (GetMyeBaySelling); returns listings created via any method (UI, Trading API, or REST API).\n\nBy default returns a COMPACT projection per listing (ItemID, SKU, Title, CurrentPrice, Quantity, ListingStatus) to keep the response small. Pass a custom `fields` array to pick specific Item fields, or `fields: ["all"]` for the full untrimmed response. Also accepts `page` and `entriesPerPage`.\n\nRequired: User OAuth token.',
     inputSchema: getActiveListingsSchema.shape,
     annotations: { readOnlyHint: true },
     handler: (api, args) => Effect.runPromise(api.trading.getActiveListings(args)),

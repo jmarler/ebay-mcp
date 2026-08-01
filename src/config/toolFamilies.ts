@@ -32,6 +32,7 @@ export const TOOL_FAMILY_KEYS = [
   'other',
   'developer',
   'trading',
+  'buy',
 ] as const;
 
 /** A valid tool-family key. */

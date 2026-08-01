@@ -6,8 +6,13 @@ import { Effect } from 'effect';
 
 /** Marketplace-scoped metadata request with an optional category filter. */
 const marketplaceMetadataSchema = z.object({
-  marketplaceId: z.nativeEnum(MarketplaceId).describe('Marketplace ID'),
-  filter: z.string().optional().describe('Filter criteria'),
+  marketplaceId: z
+    .nativeEnum(MarketplaceId)
+    .describe('REQUIRED eBay marketplace ID, e.g. EBAY_US, EBAY_GB, EBAY_DE, EBAY_AU, EBAY_CA'),
+  filter: z
+    .string()
+    .optional()
+    .describe('Optional filter, e.g. categoryIds:{15032} to scope policies to a category'),
 });
 
 /** Marketplace-scoped metadata request with no filter parameter. */
@@ -194,7 +199,8 @@ export const metadataEntries: ToolEntry[] = [
   }),
   defineTool({
     name: 'ebay_get_item_condition_policies',
-    description: 'Get item condition policies for a marketplace',
+    description:
+      'Get item condition policies for a marketplace: which item conditions are allowed per category, and where a condition is required.\n\nREQUIRED parameter: marketplaceId (e.g. EBAY_US, EBAY_GB, EBAY_DE, EBAY_AU, EBAY_CA) — the call fails without it. Optional: filter (e.g. categoryIds:{15032}) to scope to specific categories.',
     inputSchema: marketplaceMetadataSchema.shape,
     handler: (api, args) => Effect.runPromise(api.metadata.getItemConditionPolicies(args)),
   }),

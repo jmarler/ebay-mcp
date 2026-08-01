@@ -182,10 +182,25 @@ export const getSellerStandardsProfileInputSchema = z.object({
 
 /** Input accepted by Analytics API getTrafficReport. */
 export const getTrafficReportInputSchema = z.object({
-  dimension: z.string().describe('Report dimension, e.g., LISTING or DAY'),
-  filter: z.string().describe('eBay traffic report filter expression'),
-  metric: z.string().describe('Comma-delimited report metrics to retrieve'),
-  sort: z.string().optional().describe('Optional metric sort expression'),
+  dimension: z
+    .string()
+    .describe('REQUIRED report dimension. Valid values: DAY or LISTING (nothing else).'),
+  filter: z
+    .string()
+    .describe(
+      'REQUIRED filter expression. MUST include marketplace_ids:{EBAY_US} and date_range:[YYYYMMDD..YYYYMMDD]. Optional keys: listing_ids:{...}, traffic_source:{ORGANIC|PROMOTED_LISTINGS}. Example: "marketplace_ids:{EBAY_US},date_range:[20260701..20260731]"',
+    ),
+  metric: z
+    .string()
+    .describe(
+      'REQUIRED comma-delimited metrics. Valid: CLICK_THROUGH_RATE, LISTING_IMPRESSION_SEARCH_RESULTS_PAGE, LISTING_IMPRESSION_STORE, LISTING_IMPRESSION_TOTAL, LISTING_VIEWS_SOURCE_DIRECT, LISTING_VIEWS_SOURCE_OFF_EBAY, LISTING_VIEWS_SOURCE_OTHER_EBAY, LISTING_VIEWS_SOURCE_SEARCH_RESULTS_PAGE, LISTING_VIEWS_SOURCE_STORE, LISTING_VIEWS_TOTAL, SALES_CONVERSION_RATE, TRANSACTION.',
+    ),
+  sort: z
+    .string()
+    .optional()
+    .describe(
+      'Optional sort. MUST be one of the METRIC names above (not a dimension) — e.g. "LISTING_IMPRESSION_TOTAL", or "-LISTING_IMPRESSION_TOTAL" for descending. A dimension value like "DAY" is NOT valid here.',
+    ),
 });
 
 // ============================================================================

@@ -12,6 +12,7 @@ import { communicationEntries } from './communication.js';
 import { otherEntries } from './other.js';
 import { developerEntries } from './developer.js';
 import { tradingEntries } from './trading.js';
+import { buyEntries } from './buy.js';
 
 /**
  * A named group of registered tool entries, owned by one eBay API area (or the
@@ -46,6 +47,7 @@ export const toolCategories: ToolCategory[] = [
   { key: 'other', title: 'Other', entries: otherEntries },
   { key: 'developer', title: 'Developer', entries: developerEntries },
   { key: 'trading', title: 'Trading', entries: tradingEntries },
+  { key: 'buy', title: 'Buy', entries: buyEntries },
 ];
 
 /**

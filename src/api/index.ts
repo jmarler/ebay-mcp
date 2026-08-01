@@ -1,5 +1,6 @@
 import { AccountApi } from '@/api/account-management/account.js';
 import { AnalyticsApi } from '@/api/analytics-and-report/analytics.js';
+import { BrowseApi } from '@/api/buy/browse.js';
 import { EbayApiClient } from '@/api/client.js';
 import { FeedbackApi } from '@/api/communication/feedback.js';
 import { MessageApi } from '@/api/communication/message.js';
@@ -52,6 +53,7 @@ export class EbaySellerApi {
   public edelivery: EDeliveryApi;
   public developer: DeveloperApi;
   public trading: TradingApi;
+  public browse: BrowseApi;
 
   constructor(config: EbayConfig) {
     this.config = config;
@@ -79,6 +81,7 @@ export class EbaySellerApi {
     this.developer = new DeveloperApi(this.client);
     const tradingClient = new TradingApiClient(this.client);
     this.trading = new TradingApi(tradingClient);
+    this.browse = new BrowseApi(this.client);
   }
 
   /**
@@ -142,6 +145,7 @@ export class EbaySellerApi {
 
 export * from '@/api/account-management/account.js';
 export * from '@/api/analytics-and-report/analytics.js';
+export * from '@/api/buy/browse.js';
 export * from '@/api/client.js';
 export * from '@/api/communication/feedback.js';
 export * from '@/api/communication/message.js';

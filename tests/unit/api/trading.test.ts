@@ -11,32 +11,70 @@ beforeEach(() => {
   api = new TradingApi(mockClient as unknown as TradingApiClient);
 });
 
-it('returns raw active listings payload from GetMyeBaySelling', async () => {
-  const activeListingsResponse = {
-    Ack: 'Success',
-    ActiveList: {
-      ItemArray: {
-        Item: [
-          {
-            ItemID: '167382780779',
-            Title: 'Bambu Lab 0.2mm Nozzle',
-            SKU: 'NZ-2MM',
-            Quantity: 10,
-            QuantityAvailable: 4,
-            SellingStatus: { CurrentPrice: { '#text': 12.99 } },
-            WatchCount: 3,
-            ListingType: 'FixedPriceItem',
-          },
-        ],
-      },
-      PaginationResult: { TotalNumberOfEntries: 1, TotalNumberOfPages: 1 },
+const sampleActiveListingsResponse = () => ({
+  Ack: 'Success',
+  ActiveList: {
+    ItemArray: {
+      Item: [
+        {
+          ItemID: '167382780779',
+          Title: 'Bambu Lab 0.2mm Nozzle',
+          SKU: 'NZ-2MM',
+          Quantity: 10,
+          QuantityAvailable: 4,
+          SellingStatus: { CurrentPrice: { '#text': 12.99 }, ListingStatus: 'Active' },
+          WatchCount: 3,
+          ListingType: 'FixedPriceItem',
+        },
+      ],
     },
-  };
+    PaginationResult: { TotalNumberOfEntries: 1, TotalNumberOfPages: 1 },
+  },
+});
+
+it('returns the raw active listings payload when fields is ["all"]', async () => {
+  const activeListingsResponse = sampleActiveListingsResponse();
   mockClient.execute.mockReturnValue(Effect.succeed(activeListingsResponse));
 
-  const result = await Effect.runPromise(api.getActiveListings());
+  const result = await Effect.runPromise(api.getActiveListings({ fields: ['all'] }));
 
   expect(result).toBe(activeListingsResponse);
+});
+
+it('returns a compact projection of active listings by default', async () => {
+  mockClient.execute.mockReturnValue(Effect.succeed(sampleActiveListingsResponse()));
+
+  const result = (await Effect.runPromise(api.getActiveListings())) as {
+    ActiveList: { ItemArray: { Item: Record<string, unknown>[] } };
+  };
+  const item = result.ActiveList.ItemArray.Item[0];
+
+  // Only the compact default fields are kept; nested price/status are hoisted.
+  expect(item).toEqual({
+    ItemID: '167382780779',
+    SKU: 'NZ-2MM',
+    Title: 'Bambu Lab 0.2mm Nozzle',
+    CurrentPrice: { '#text': 12.99 },
+    Quantity: 10,
+    ListingStatus: 'Active',
+  });
+  expect(item).not.toHaveProperty('WatchCount');
+  expect(item).not.toHaveProperty('SellingStatus');
+});
+
+it('projects only the requested custom fields for active listings', async () => {
+  mockClient.execute.mockReturnValue(Effect.succeed(sampleActiveListingsResponse()));
+
+  const result = (await Effect.runPromise(
+    api.getActiveListings({ fields: ['ItemID', 'Title'] }),
+  )) as {
+    ActiveList: { ItemArray: { Item: Record<string, unknown>[] } };
+  };
+
+  expect(result.ActiveList.ItemArray.Item[0]).toEqual({
+    ItemID: '167382780779',
+    Title: 'Bambu Lab 0.2mm Nozzle',
+  });
 });
 
 it('returns empty active listings payload unchanged', async () => {
