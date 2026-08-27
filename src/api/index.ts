@@ -15,6 +15,7 @@ import { DisputeApi } from '@/api/order-management/dispute.js';
 import { FulfillmentApi } from '@/api/order-management/fulfillment.js';
 import { BrowseApi } from '@/api/other/browse.js';
 import { ComplianceApi } from '@/api/other/compliance.js';
+import { MediaApi } from '@/api/other/media.js';
 import { EDeliveryApi } from '@/api/other/edelivery.js';
 import { FindingApi } from '@/api/other/finding.js';
 import { IdentityApi } from '@/api/other/identity.js';
@@ -54,6 +55,7 @@ export class EbaySellerApi {
   public edelivery: EDeliveryApi;
   public finding: FindingApi;
   public browse: BrowseApi;
+  public media: MediaApi;
   public developer: DeveloperApi;
   public trading: TradingApi;
 
@@ -82,6 +84,7 @@ export class EbaySellerApi {
     this.edelivery = new EDeliveryApi(this.client);
     this.finding = new FindingApi(this.client);
     this.browse = new BrowseApi(this.client);
+    this.media = new MediaApi(this.client);
     this.developer = new DeveloperApi(this.client);
     const tradingClient = new TradingApiClient(this.client);
     this.trading = new TradingApi(tradingClient);

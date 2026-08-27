@@ -10,6 +10,7 @@ import { metadataEntries } from './metadata.js';
 import { taxonomyEntries } from './taxonomy.js';
 import { communicationEntries } from './communication.js';
 import { browseEntries } from './browse.js';
+import { mediaEntries } from './media.js';
 import { otherEntries } from './other.js';
 import { developerEntries } from './developer.js';
 import { tradingEntries } from './trading.js';
@@ -45,6 +46,7 @@ export const toolCategories: ToolCategory[] = [
   { key: 'taxonomy', title: 'Taxonomy', entries: taxonomyEntries },
   { key: 'communication', title: 'Communication', entries: communicationEntries },
   { key: 'browse', title: 'Browse', entries: browseEntries },
+  { key: 'media', title: 'Media', entries: mediaEntries },
   { key: 'other', title: 'Other', entries: otherEntries },
   { key: 'developer', title: 'Developer', entries: developerEntries },
   { key: 'trading', title: 'Trading', entries: tradingEntries },

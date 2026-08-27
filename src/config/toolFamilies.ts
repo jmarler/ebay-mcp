@@ -30,6 +30,7 @@ export const TOOL_FAMILY_KEYS = [
   'taxonomy',
   'communication',
   'browse',
+  'media',
   'other',
   'developer',
   'trading',
