@@ -37,9 +37,12 @@ COPY --from=builder /app/docs ./docs
 # Icon assets served by the HTTP transport at /icons
 COPY --from=builder /app/public ./public
 
-# Default HTTP port (Railway and similar platforms inject PORT; httpTransport
-# picks up PORT and binds 0.0.0.0 automatically when MCP_HOST is unset)
+# Default HTTP port (only relevant when overriding CMD to run the HTTP transport
+# for a cloud deploy; Railway and similar platforms inject PORT and httpTransport
+# binds 0.0.0.0 automatically when MCP_HOST is unset)
 EXPOSE 3000
 
-# HTTP transport entrypoint for container deploys
-CMD ["node", "build/serverHttp.js"]
+# Default to the STDIO transport: this image is run as `docker run -i ... ebay-mcp`
+# and spoken to over stdin/stdout by a local MCP client (Claude Desktop). For a
+# cloud HTTP deploy, override with: CMD ["node", "build/serverHttp.js"].
+CMD ["node", "build/index.js"]
