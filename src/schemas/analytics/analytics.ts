@@ -182,10 +182,25 @@ export const getSellerStandardsProfileInputSchema = z.object({
 
 /** Input accepted by Analytics API getTrafficReport. */
 export const getTrafficReportInputSchema = z.object({
-  dimension: z.string().describe('Report dimension, e.g., LISTING or DAY'),
-  filter: z.string().describe('eBay traffic report filter expression'),
-  metric: z.string().describe('Comma-delimited report metrics to retrieve'),
-  sort: z.string().optional().describe('Optional metric sort expression'),
+  dimension: z
+    .string()
+    .describe('Report dimension: DAY (traffic per day) or LISTING (traffic per listing)'),
+  filter: z
+    .string()
+    .describe(
+      'Traffic report filter expression. Common filters: marketplace_ids:{EBAY_US}, and a date_range:[YYYYMMDD..YYYYMMDD]. Example: "marketplace_ids:{EBAY_US},date_range:[20260701..20260731]"',
+    ),
+  metric: z
+    .string()
+    .describe(
+      'Comma-delimited metrics, e.g. "LISTING_IMPRESSION_TOTAL,CLICK_THROUGH_RATE,LISTING_VIEWS_TOTAL,TRANSACTION". Other metrics include SALES_CONVERSION_RATE and LISTING_IMPRESSION_SEARCH_RESULTS_PAGE.',
+    ),
+  sort: z
+    .string()
+    .optional()
+    .describe(
+      'Optional sort. MUST be a METRIC name, not a dimension — e.g. "-LISTING_IMPRESSION_TOTAL" (leading "-" for descending). sort:"DAY" or sort:"LISTING" is INVALID and eBay rejects it.',
+    ),
 });
 
 // ============================================================================

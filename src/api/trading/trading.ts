@@ -47,6 +47,82 @@ const asRecordArray = (value: unknown): Record<string, unknown>[] => {
  */
 export type TradingRecordResponse = Record<string, unknown>;
 
+/** Compact projection for getActiveListings when no explicit `fields` are given. */
+const DEFAULT_ACTIVE_LISTING_FIELDS = [
+  'ItemID',
+  'SKU',
+  'Title',
+  'CurrentPrice',
+  'Quantity',
+  'ListingStatus',
+] as const;
+
+/** Compact fields that live nested inside a parsed GetMyeBaySelling Item. */
+const ACTIVE_LISTING_FIELD_PATHS: Record<string, readonly string[]> = {
+  CurrentPrice: ['SellingStatus', 'CurrentPrice'],
+  ListingStatus: ['SellingStatus', 'ListingStatus'],
+};
+
+/** Read a nested value by path, returning undefined if any segment is missing. */
+const readPath = (obj: Record<string, unknown>, path: readonly string[]): unknown => {
+  let current: unknown = obj;
+  for (const key of path) {
+    if (!isRecord(current)) {
+      return;
+    }
+    current = current[key];
+  }
+  return current;
+};
+
+/** Project one parsed Item down to the requested fields, omitting absent ones. */
+const projectActiveListingItem = (
+  item: unknown,
+  fields: readonly string[],
+): Record<string, unknown> => {
+  if (!isRecord(item)) {
+    return {};
+  }
+  const projected: Record<string, unknown> = {};
+  for (const field of fields) {
+    const path = ACTIVE_LISTING_FIELD_PATHS[field];
+    const value = path ? readPath(item, path) : item[field];
+    if (value !== undefined) {
+      projected[field] = value;
+    }
+  }
+  return projected;
+};
+
+/**
+ * Trim a parsed GetMyeBaySelling response to the requested Item fields. Returns
+ * the response untouched when `fields` contains "all"; otherwise projects each
+ * Item under ActiveList.ItemArray to the chosen (or default compact) fields. The
+ * full response runs ~2 KB per listing, which is unusable for large stores.
+ */
+const trimActiveListings = (
+  response: TradingRecordResponse,
+  fields: readonly string[],
+): TradingRecordResponse => {
+  if (fields.some((field) => field.toLowerCase() === 'all')) {
+    return response;
+  }
+  const selected = fields.length > 0 ? fields : DEFAULT_ACTIVE_LISTING_FIELDS;
+  if (!(isRecord(response) && isRecord(response.ActiveList))) {
+    return response;
+  }
+  const activeList = response.ActiveList;
+  const itemArray = activeList.ItemArray;
+  if (!(isRecord(itemArray) && Array.isArray(itemArray.Item))) {
+    return response;
+  }
+  const items = itemArray.Item.map((item) => projectActiveListingItem(item, selected));
+  return {
+    ...response,
+    ActiveList: { ...activeList, ItemArray: { ...itemArray, Item: items } },
+  };
+};
+
 /**
  * High-level wrapper for seller listing operations backed by eBay Trading API calls.
  */
@@ -86,8 +162,11 @@ export class TradingApi {
       );
       const page = inputPage === undefined ? 1 : inputPage;
       const entriesPerPage = inputEntriesPerPage === undefined ? 50 : inputEntriesPerPage;
+      const fields = Array.isArray(request.fields)
+        ? request.fields.filter((field): field is string => typeof field === 'string')
+        : [];
 
-      return yield* tradingClient.execute('GetMyeBaySelling', {
+      const result = yield* tradingClient.execute('GetMyeBaySelling', {
         ActiveList: {
           Sort: 'TimeLeft',
           Pagination: {
@@ -96,6 +175,8 @@ export class TradingApi {
           },
         },
       });
+
+      return trimActiveListings(result, fields);
     });
   };
 

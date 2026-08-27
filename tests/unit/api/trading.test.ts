@@ -11,32 +11,63 @@ beforeEach(() => {
   api = new TradingApi(mockClient as unknown as TradingApiClient);
 });
 
-it('returns raw active listings payload from GetMyeBaySelling', async () => {
-  const activeListingsResponse = {
-    Ack: 'Success',
-    ActiveList: {
-      ItemArray: {
-        Item: [
-          {
-            ItemID: '167382780779',
-            Title: 'Bambu Lab 0.2mm Nozzle',
-            SKU: 'NZ-2MM',
-            Quantity: 10,
-            QuantityAvailable: 4,
-            SellingStatus: { CurrentPrice: { '#text': 12.99 } },
-            WatchCount: 3,
-            ListingType: 'FixedPriceItem',
-          },
-        ],
-      },
-      PaginationResult: { TotalNumberOfEntries: 1, TotalNumberOfPages: 1 },
+const sampleActiveListingsResponse = () => ({
+  Ack: 'Success',
+  ActiveList: {
+    ItemArray: {
+      Item: [
+        {
+          ItemID: '167382780779',
+          Title: 'Bambu Lab 0.2mm Nozzle',
+          SKU: 'NZ-2MM',
+          Quantity: 10,
+          QuantityAvailable: 4,
+          SellingStatus: { CurrentPrice: { '#text': 12.99 }, ListingStatus: 'Active' },
+          WatchCount: 3,
+          ListingType: 'FixedPriceItem',
+        },
+      ],
     },
-  };
+    PaginationResult: { TotalNumberOfEntries: 1, TotalNumberOfPages: 1 },
+  },
+});
+
+it('returns the raw active listings payload when fields=["all"]', async () => {
+  const activeListingsResponse = sampleActiveListingsResponse();
   mockClient.execute.mockReturnValue(Effect.succeed(activeListingsResponse));
+
+  const result = await Effect.runPromise(api.getActiveListings({ fields: ['all'] }));
+
+  expect(result).toBe(activeListingsResponse);
+});
+
+it('projects active listings to a compact default view', async () => {
+  mockClient.execute.mockReturnValue(Effect.succeed(sampleActiveListingsResponse()));
 
   const result = await Effect.runPromise(api.getActiveListings());
 
-  expect(result).toBe(activeListingsResponse);
+  const item = (result as any).ActiveList.ItemArray.Item[0];
+  // Compact default hoists CurrentPrice/ListingStatus out of SellingStatus and
+  // drops noisy fields like WatchCount/QuantityAvailable/ListingType.
+  expect(item).toEqual({
+    ItemID: '167382780779',
+    SKU: 'NZ-2MM',
+    Title: 'Bambu Lab 0.2mm Nozzle',
+    CurrentPrice: { '#text': 12.99 },
+    Quantity: 10,
+    ListingStatus: 'Active',
+  });
+});
+
+it('projects active listings to an explicit custom field list', async () => {
+  mockClient.execute.mockReturnValue(Effect.succeed(sampleActiveListingsResponse()));
+
+  const result = await Effect.runPromise(
+    api.getActiveListings({ fields: ['ItemID', 'WatchCount'] }),
+  );
+
+  const item = (result as any).ActiveList.ItemArray.Item[0];
+  expect(item).toEqual({ ItemID: '167382780779', WatchCount: 3 });
 });
 
 it('returns empty active listings payload unchanged', async () => {
