@@ -57,12 +57,13 @@ const emptyOutputSchema = {
   description: 'No content returned on success',
 } as OutputArgs;
 
+// A z.custom body advertises a wire schema with no `type` (just a description),
+// so MCP hosts serialize the body to a JSON *string* that eBay then rejects.
+// `z.record(z.unknown())` advertises `type: object` (the same object-schema idiom
+// the working Trading create_listing uses); the cast preserves the generated
+// `Body` type at every call site and for the handler args (SSOT stays the type).
 const generatedBodySchema = <Body>(description: string) =>
-  z
-    .custom<Body>((value) => value !== null && typeof value === 'object' && !Array.isArray(value), {
-      message: description,
-    })
-    .describe(description);
+  z.record(z.unknown()).describe(description) as unknown as ReturnType<typeof z.custom<Body>>;
 
 const skuInputSchema = z.object({
   sku: z.string().describe('The seller-defined SKU'),

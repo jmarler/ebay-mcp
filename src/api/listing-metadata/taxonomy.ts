@@ -16,6 +16,7 @@ import {
 import { categoryTreeIdInputSchema } from '@/schemas/taxonomy/categoryTree.js';
 import type { components } from '@/types/sell-apps/listing-metadata/commerceTaxonomyV1Oas3.js';
 import type { z } from 'zod';
+import { isRecord } from '@/utils/typeGuards.js';
 import { Effect } from 'effect';
 
 /**
@@ -61,6 +62,10 @@ export interface GetItemAspectsForCategoryInput {
   readonly categoryTreeId: string;
   /** Category identifier whose item aspects should be returned. */
   readonly categoryId: string;
+  /** Keep only aspects required for listing (`aspectConstraint.aspectRequired`). */
+  readonly requiredOnly?: boolean;
+  /** Cap the suggested values returned per aspect. Defaults to {@link DEFAULT_MAX_ASPECT_VALUES}. */
+  readonly maxValuesPerAspect?: number;
 }
 
 /** Input accepted by getCompatibilityProperties. */
@@ -122,6 +127,42 @@ export type GetCategorySuggestionsResponse =
  * @see https://developer.ebay.com/api-docs/commerce/taxonomy/resources/category_tree/methods/getItemAspectsForCategory
  */
 export type GetItemAspectsForCategoryResponse = components['schemas']['AspectMetadata'] | undefined;
+
+/** Default cap on suggested values returned per aspect, to keep responses small. */
+const DEFAULT_MAX_ASPECT_VALUES = 10;
+
+/** True when a taxonomy aspect is required for listing (`aspectConstraint.aspectRequired`). */
+const isRequiredAspect = (aspect: unknown): boolean =>
+  isRecord(aspect) &&
+  isRecord(aspect.aspectConstraint) &&
+  aspect.aspectConstraint.aspectRequired === true;
+
+/**
+ * Trim a getItemAspectsForCategory response to keep it consumable: optionally
+ * drop non-required aspects, and cap the suggested values per aspect. The full
+ * response for a single category can exceed 600 KB (e.g. a "Brand" aspect with
+ * hundreds of values), which is unusable by most MCP hosts.
+ */
+const trimItemAspects = (
+  response: GetItemAspectsForCategoryResponse,
+  requiredOnly: boolean,
+  maxValuesPerAspect: number,
+): GetItemAspectsForCategoryResponse => {
+  if (!(isRecord(response) && Array.isArray(response.aspects))) {
+    return response;
+  }
+  const source = requiredOnly ? response.aspects.filter(isRequiredAspect) : response.aspects;
+  const aspects = source.map((aspect) => {
+    if (
+      !(isRecord(aspect) && Array.isArray(aspect.aspectValues)) ||
+      aspect.aspectValues.length <= maxValuesPerAspect
+    ) {
+      return aspect;
+    }
+    return { ...aspect, aspectValues: aspect.aspectValues.slice(0, maxValuesPerAspect) };
+  });
+  return { ...response, aspects };
+};
 
 /**
  * Response returned by eBay Taxonomy API getCompatibilityProperties; `undefined` when eBay answers HTTP 204
@@ -349,11 +390,20 @@ export class TaxonomyApi {
         categoryId: { wireName: 'category_id', value: categoryId },
       });
 
-      return yield* requestGetEffect<GetItemAspectsForCategoryResponse>(
+      const response = yield* requestGetEffect<GetItemAspectsForCategoryResponse>(
         client,
         `${basePath}/category_tree/${categoryTreeId}/get_item_aspects_for_category`,
         params,
       );
+
+      const requiredOnly = validatedInput.requiredOnly === true;
+      const maxValuesPerAspect =
+        typeof validatedInput.maxValuesPerAspect === 'number' &&
+        validatedInput.maxValuesPerAspect >= 0
+          ? validatedInput.maxValuesPerAspect
+          : DEFAULT_MAX_ASPECT_VALUES;
+
+      return trimItemAspects(response, requiredOnly, maxValuesPerAspect);
     });
   };
 

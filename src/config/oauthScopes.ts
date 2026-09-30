@@ -55,8 +55,8 @@ export const productionScopes: readonly string[] = [
   'https://api.ebay.com/oauth/api_scope/commerce.feedback',
   // View and manage shipping information
   'https://api.ebay.com/oauth/api_scope/commerce.shipping',
-  // Allows readonly access to Feedback APIs.
-  'https://api.ebay.com/oauth/api_scope/commerce.feedback.readonly',
+  // commerce.feedback.readonly is omitted: eBay grants it only under the client-credentials
+  // grant, so requesting it in the authorization-code flow fails with invalid_scope.
 ];
 
 /** Scopes available to apps in the eBay sandbox environment. */
