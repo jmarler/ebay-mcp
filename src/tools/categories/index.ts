@@ -8,6 +8,7 @@ import { fulfillmentEntries } from './fulfillment.js';
 import { marketingEntries } from './marketing.js';
 import { analyticsEntries } from './analytics.js';
 import { metadataEntries } from './metadata.js';
+import { shippingMetadataEntries } from './shippingMetadata.js';
 import { taxonomyEntries } from './taxonomy.js';
 import { communicationEntries } from './communication.js';
 import { browseEntries } from './browse.js';
@@ -42,7 +43,7 @@ export const toolCategories: ToolCategory[] = [
   { key: 'fulfillment', title: 'Fulfillment', entries: fulfillmentEntries },
   { key: 'marketing', title: 'Marketing', entries: marketingEntries },
   { key: 'analytics', title: 'Analytics', entries: analyticsEntries },
-  { key: 'metadata', title: 'Metadata', entries: metadataEntries },
+  { key: 'metadata', title: 'Metadata', entries: [...metadataEntries, ...shippingMetadataEntries] },
   { key: 'taxonomy', title: 'Taxonomy', entries: taxonomyEntries },
   { key: 'communication', title: 'Communication', entries: communicationEntries },
   { key: 'browse', title: 'Browse', entries: browseEntries },
