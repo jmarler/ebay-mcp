@@ -13,6 +13,12 @@ const listingFormatSchema = z
 export const getActiveListingsSchema = z.object({
   page: z.number().optional().describe('Page number, defaulting to 1'),
   entriesPerPage: z.number().optional().describe('Items per page, defaulting to 50'),
+  fields: z
+    .array(z.string())
+    .optional()
+    .describe(
+      'Item fields to return per listing. Omit for a compact default (ItemID, SKU, Title, ListingType, CurrentPrice, Quantity, ListingStatus) — the full response is large (~2 KB/listing). Pass a custom list of Item field names to pick specific fields, or ["all"] for the full untrimmed eBay response.',
+    ),
 });
 
 /** Input accepted by getListing. */

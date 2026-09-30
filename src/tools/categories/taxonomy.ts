@@ -23,6 +23,18 @@ const getCategorySuggestionsSchema = z.object({
 const getItemAspectsForCategorySchema = z.object({
   categoryTreeId: z.string().describe('Category tree ID'),
   categoryId: z.string().describe('Category ID'),
+  requiredOnly: z
+    .boolean()
+    .optional()
+    .describe(
+      'When true, return only aspects required to list (aspectConstraint.aspectRequired). Greatly shrinks the response.',
+    ),
+  maxValuesPerAspect: z
+    .number()
+    .optional()
+    .describe(
+      'Cap the suggested values returned per aspect (default 10). The full list can be hundreds of values per aspect.',
+    ),
 });
 
 /** Taxonomy API tools for category trees, category suggestions, and compatibility metadata. */
@@ -72,7 +84,7 @@ export const taxonomyEntries: ToolEntry[] = [
   defineTool({
     name: 'ebay_get_item_aspects_for_category',
     description:
-      'Identify required and recommended item specifics for a category before creating an inventory item or checking listing fees',
+      'Identify required and recommended item specifics for a category before creating an inventory item or checking listing fees.\n\nThe full response can be very large (600 KB+ for one category) because some aspects list hundreds of suggested values. Use requiredOnly=true to return only the aspects required to list, and maxValuesPerAspect (default 10) to cap suggested values per aspect.',
     inputSchema: getItemAspectsForCategorySchema.shape,
     outputSchema: {
       type: 'object',
