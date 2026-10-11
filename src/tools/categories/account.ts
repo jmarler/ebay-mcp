@@ -127,7 +127,7 @@ export const accountEntries: ToolEntry[] = [
       'shippingServiceCode must be a marketplace-valid eBay service enum (not a free-form carrier nickname). ' +
       'Invalid codes return "Please select a valid shipping service". eBay may cite DomesticItemShippingService[0] ' +
       'and [1] for a single bad entry — that is remote validation, not client array duplication. ' +
-      'Discover valid codes via Trading GeteBayDetails (ShippingServiceDetails). ' +
+      'Discover valid codes with ebay_get_shipping_services (Metadata API; use services with validForSellingFlow=true). ' +
       'Known-good EBAY_US FLAT_RATE sketch: policy.name, policy.marketplaceId=EBAY_US, ' +
       'policy.categoryTypes=[{name:ALL_EXCLUDING_MOTORS_VEHICLES}], policy.handlingTime={unit:DAY,value:1}, ' +
       'policy.shippingOptions=[{costType:FLAT_RATE,optionType:DOMESTIC,shippingServices:[{shippingServiceCode:USPSPriority,shippingCost:{currency:USD,value:"5.99"}}]}]. ' +
