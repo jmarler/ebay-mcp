@@ -49,7 +49,7 @@ export const fulfillmentEntries: ToolEntry[] = [
   defineTool({
     name: 'ebay_get_orders',
     description:
-      'Retrieve orders for the seller.\n\nRequired OAuth Scope: sell.fulfillment.readonly or sell.fulfillment\nMinimum Scope: https://api.ebay.com/oauth/api_scope/sell.fulfillment.readonly',
+      'Retrieve orders for the seller. Each order carries totalMarketplaceFee (eBay fees for the order); for a per-fee breakdown, ad fees, and net proceeds use ebay_get_transactions.\n\nRequired OAuth Scope: sell.fulfillment.readonly or sell.fulfillment\nMinimum Scope: https://api.ebay.com/oauth/api_scope/sell.fulfillment.readonly',
     inputSchema: getOrdersInputSchema.shape,
     outputSchema: zodToJsonSchema(getOrdersOutputSchema, {
       name: 'GetOrdersResponse',

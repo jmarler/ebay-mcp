@@ -123,6 +123,7 @@ export const mapOrdersToTable = (orderPage: OrderSearchPagedCollection): TableVi
       { key: 'payment', label: 'Payment' },
       { key: 'buyer', label: 'Buyer' },
       { key: 'total', label: 'Total', align: 'right' },
+      { key: 'fees', label: 'eBay fees', align: 'right' },
     ],
     rows: orders.map((order, index) => ({
       id: order.orderId ?? `order-${index}`,
@@ -133,6 +134,7 @@ export const mapOrdersToTable = (orderPage: OrderSearchPagedCollection): TableVi
         payment: humanizeStatus(order.orderPaymentStatus),
         buyer: order.buyer?.username ?? null,
         total: formatAmount(order.pricingSummary?.total),
+        fees: formatAmount(order.totalMarketplaceFee),
       },
       drill: order.orderId
         ? { tool: 'ebay_get_order', arguments: { orderId: order.orderId }, label: 'View order' }
@@ -355,7 +357,7 @@ export const mapDisputeSummariesToTable = (
 };
 
 /**
- * Projects a single order into a detail card with status badges and line items.
+ * Projects a single order into a detail card with status badges, eBay fees, and line items.
  *
  * @param order - Generated fulfillment order response from eBay.
  * @returns A card view model with summary and line-item sections.
@@ -387,6 +389,8 @@ export const mapOrderToCard = (order: Order): CardViewModel => {
         fields: [
           { label: 'Created', value: order.creationDate ?? null },
           { label: 'Total', value: formatAmount(order.pricingSummary?.total) },
+          { label: 'eBay fees', value: formatAmount(order.totalMarketplaceFee) },
+          { label: 'Fee basis', value: formatAmount(order.totalFeeBasisAmount) },
           { label: 'Line items', value: lineItems.length },
         ],
       },
