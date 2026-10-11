@@ -120,6 +120,7 @@ describe('table mappers', () => {
           orderPaymentStatus: 'PAID',
           buyer: { username: 'buyer1' },
           pricingSummary: { total: { value: '25.99', currency: 'USD' } },
+          totalMarketplaceFee: { value: '3.54', currency: 'USD' },
         },
       ],
       total: 240,
@@ -133,12 +134,14 @@ describe('table mappers', () => {
       'payment',
       'buyer',
       'total',
+      'fees',
     ]);
     expect(view.rows).toHaveLength(1);
     const [row] = view.rows;
     expect(row.id).toBe('12-3456');
     expect(row.cells.fulfillment).toBe('Fulfilled');
     expect(row.cells.total).toBe('25.99 USD');
+    expect(row.cells.fees).toBe('3.54 USD');
     expect(row.drill).toEqual({
       tool: 'ebay_get_order',
       arguments: { orderId: '12-3456' },
@@ -271,6 +274,8 @@ describe('card mappers', () => {
       buyer: { username: 'buyer1' },
       creationDate: '2026-06-01T00:00:00.000Z',
       pricingSummary: { total: { value: '25.99', currency: 'USD' } },
+      totalMarketplaceFee: { value: '3.54', currency: 'USD' },
+      totalFeeBasisAmount: { value: '25.99', currency: 'USD' },
       lineItems: [{ title: 'Widget', sku: 'SKU-1', quantity: 2 }],
     });
     expect(view.archetype).toBe('card');
@@ -281,6 +286,8 @@ describe('card mappers', () => {
     ]);
     const summary = view.sections.find((section) => section.heading === 'Summary');
     expect(summary?.fields).toContainEqual({ label: 'Total', value: '25.99 USD' });
+    expect(summary?.fields).toContainEqual({ label: 'eBay fees', value: '3.54 USD' });
+    expect(summary?.fields).toContainEqual({ label: 'Fee basis', value: '25.99 USD' });
     const items = view.sections.find((section) => section.heading === 'Items');
     expect(items?.fields[0]).toEqual({ label: 'Widget', value: '×2' });
   });
