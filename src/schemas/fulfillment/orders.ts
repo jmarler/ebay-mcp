@@ -207,7 +207,9 @@ export const getOrdersInputSchema = z.object({
   filter: z
     .string()
     .optional()
-    .describe('Filter criteria for orders (e.g., creationdate:[2024-01-01..2024-12-31])'),
+    .describe(
+      'Filter criteria for orders, with full ISO 8601 UTC timestamps (e.g. creationdate:[2024-01-01T00:00:00.000Z..2024-12-31T23:59:59.999Z]). Without a creationdate filter eBay returns roughly the last 90 days; orders older than two years are not returned.',
+    ),
   limit: z.number().optional().describe('Number of orders to return per page'),
   offset: z.number().optional().describe('Number of orders to skip for pagination'),
   orderIds: z.string().optional().describe('Comma-separated list of order IDs'),
