@@ -1,4 +1,5 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
+import { execFileSync } from 'child_process';
+import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import path from 'path';
 import dotenv from 'dotenv';
@@ -17,6 +18,7 @@ import {
   maskToken,
 } from '@/auth/credentialSession.js';
 import { CREDENTIAL_ENV_PATH, resolveCredentialEnvPath } from '@/config/credentialFile.js';
+import process from 'node:process';
 
 describe('credential session', () => {
   let tempDir: string | undefined;
@@ -50,6 +52,20 @@ describe('credential session', () => {
       EBAY_USER_REFRESH_TOKEN: 'refresh',
     });
   });
+
+  it.skipIf(process.platform === 'win32')(
+    'skips persistence when .env is a named pipe (1Password Environments)',
+    () => {
+      tempDir = mkdtempSync(path.join(tmpdir(), 'ebay-credential-store-fifo-'));
+      const envPath = path.join(tempDir, '.env');
+      execFileSync('mkfifo', [envPath]);
+
+      const store = new DotEnvCredentialStore(() => envPath);
+      Effect.runSync(store.write({ EBAY_USER_ACCESS_TOKEN: 'access' }));
+
+      expect(statSync(envPath).isFIFO()).toBe(true);
+    },
+  );
 
   it('resolves the credential file from the installed package root (issue #157)', () => {
     const installedModuleUrl = new URL('../../../build/config/credentialFile.js', import.meta.url);

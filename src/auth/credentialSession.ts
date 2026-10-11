@@ -1,7 +1,16 @@
 import dotenv from 'dotenv';
-import { closeSync, existsSync, fsyncSync, openSync, readFileSync, writeFileSync } from 'fs';
+import {
+  closeSync,
+  existsSync,
+  fsyncSync,
+  openSync,
+  readFileSync,
+  statSync,
+  writeFileSync,
+} from 'fs';
 import { CREDENTIAL_ENV_PATH } from '@/config/credentialFile.js';
 import { stringifyEnv } from '@/utils/envFile.js';
+import { authLogger } from '@/utils/logger.js';
 import type { EbayConfig, EbayUserToken, StoredTokenData } from '@/types/ebay.js';
 import { Data, Effect } from 'effect';
 
@@ -87,6 +96,8 @@ export class DotEnvCredentialStore implements CredentialStore {
    * Concurrent writes are serialized so one call cannot overwrite another
    * caller's keys. After the file is written, the store fsyncs the file
    * descriptor when the path exists so crash/kill is less likely to drop tokens.
+   * When `.env` is not a regular file (e.g. a 1Password Environments pipe), the
+   * write is skipped and refreshed tokens live only in memory.
    *
    * @param updates - Environment variable names and values to persist.
    * @returns An Effect that succeeds after `.env` is written.
@@ -103,6 +114,13 @@ export class DotEnvCredentialStore implements CredentialStore {
     return writeLock.withPermits(1)(
       Effect.try({
         try: () => {
+          // A secrets manager can mount .env as a read-only named pipe; opening it for
+          // writing would block, so keep refreshed tokens in memory instead.
+          if (existsSync(envPath) && !statSync(envPath).isFile()) {
+            authLogger.info(`Skipping token persistence: ${envPath} is not a regular file`);
+            return;
+          }
+
           // Drop non-string values so a missing refresh_token cannot persist as empty.
           const sanitizedUpdates: Record<string, string> = {};
           for (const [name, envValue] of Object.entries(updates)) {
