@@ -49,7 +49,7 @@ All required files are present and comprehensive.
 
 ### Required Disclaimers ✅
 
-The project includes prominent disclaimers (README.md lines 19-54):
+The project includes prominent disclaimers (the README header and its **Disclaimer** callout, plus the FAQ):
 
 1. **NOT an official eBay project** - Clearly stated in disclaimer section
 2. **NOT affiliated with eBay Inc.** - Explicitly mentioned
@@ -58,7 +58,7 @@ The project includes prominent disclaimers (README.md lines 19-54):
 
 ### eBay API Terms Reference ✅
 
-Direct link to official terms: [eBay's API Terms of Use](https://developer.ebay.com/join/api_license_agreement)
+Direct link to official terms: [eBay's API Terms of Use](https://developer.ebay.com/join/api_license_agreement), plus eBay's [data-handling requirements](https://developer.ebay.com/api-docs/static/data-handling-update.html) (linked from the README disclaimer)
 
 Users are explicitly instructed to:
 - ✅ Comply with eBay's API Terms of Use
@@ -89,10 +89,9 @@ The project properly integrates with eBay's Developer Program:
    - Rate limit error handling
 
 4. **API Coverage**
-   - 99.1% coverage of eBay Sell APIs
-   - 230+ tools across all API categories
+   - 384 tools across 360 endpoints, covering eBay's Sell APIs
    - Follows eBay API specifications
-   - OpenAPI-generated types for accuracy
+   - OpenAPI-generated types for accuracy (`pnpm sync`, see [docs/API_STATUS.md](docs/API_STATUS.md))
 
 ## Security and Responsible Use
 
@@ -102,7 +101,7 @@ From [SECURITY.md](SECURITY.md):
 
 1. **Vulnerability Reporting**
    - GitHub Security Advisory: https://github.com/YosefHayim/ebay-mcp/security/advisories/new
-   - Email contact: yosefhayim.sabag@gmail.com
+   - Email contact: see [SECURITY.md](SECURITY.md)
    - Responsible disclosure process
 
 2. **Security Best Practices**
@@ -130,15 +129,15 @@ Contributors agree that:
 - Contributions are licensed under MIT License
 - Code must follow TypeScript strict mode
 - All external inputs must be validated (Zod schemas)
-- Tests must maintain 90%+ coverage
+- Tests must meet the coverage thresholds in `vitest.config.ts`
 - Documentation must be updated
 
 ### Quality Standards ✅
 
 - ✅ **Type Safety:** Full TypeScript with strict mode
 - ✅ **Input Validation:** Zod schemas for all MCP tools
-- ✅ **Testing:** 870+ tests, 99%+ function coverage
-- ✅ **Code Quality:** ESLint, Prettier, conventional commits
+- ✅ **Testing:** Vitest unit and integration suites with enforced coverage thresholds (90%+ functions)
+- ✅ **Code Quality:** Biome (lint + format), conventional commits
 - ✅ **Documentation:** Comprehensive README and guides
 
 ## Compliance Summary
@@ -151,7 +150,7 @@ Contributors agree that:
 | **API Terms** | Link to eBay Terms of Use | ✅ Present |
 | **Security** | Vulnerability reporting process | ✅ Established |
 | **Best Practices** | Follow repository standards | ✅ Compliant |
-| **Testing** | Comprehensive test coverage | ✅ 870+ tests |
+| **Testing** | Comprehensive test coverage | ✅ Enforced thresholds |
 | **Developer Program** | Proper credential management | ✅ Compliant |
 | **Rate Limits** | Respect eBay rate limits | ✅ Implemented |
 | **Environments** | Sandbox/production separation | ✅ Supported |
@@ -194,7 +193,7 @@ While not required, the project could consider:
 
 ## Last Updated
 
-2025-11-17
+2026-10-12
 
 ---
 

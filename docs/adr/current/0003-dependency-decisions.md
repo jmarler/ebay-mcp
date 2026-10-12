@@ -2,6 +2,13 @@
 
 **Status:** Accepted · 2026-07-02 · refreshed 2026-07-06
 
+> **Status update (2026-10-12):** Partly superseded, then restored. An Effect Schema
+> adapter (`src/utils/effectSchema*.ts`) was adopted on 2026-07-07 despite the "do not
+> adopt Effect Schema" line below; upstream #186 removed it, so Zod v3 is again the only
+> schema library and `effect` is used for async work and typed errors only. The JWT
+> verifier is now `src/auth/tokenVerifier.ts`. Current schema rules:
+> [src/schemas/README.md](../../../src/schemas/README.md).
+
 ## Context
 
 Audit of `package.json` while codifying code style. Findings:

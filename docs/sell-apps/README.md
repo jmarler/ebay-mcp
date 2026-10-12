@@ -1,15 +1,17 @@
 # eBay API Spec Sources
 
-Spec-URL manifest consumed by `npm run sync` (`src/scripts/dev-sync.ts`). The sync
-tool extracts every `*_oas3.json` link listed below, downloads each OpenAPI spec
-into `docs/`, regenerates TypeScript types, and reports endpoints that have no tool
-yet. Keep example/illustrative URLs out of this file — the scraper treats every
-JSON link it finds here as a real download target.
+Human-readable list of the eBay OpenAPI specs this project tracks. The list that
+`pnpm sync` (`src/scripts/devSync.ts`) actually downloads lives in
+`src/scripts/specSources.ts`: each entry names the API, its folder, and its spec URL.
+The sync caches the specs in `.cache/ebay-specs/` (git-ignored), regenerates the
+TypeScript types under `src/types/`, and reports endpoints that have no tool yet (see
+[API_STATUS.md](../API_STATUS.md)). To add or change a spec, edit `specSources.ts` and
+keep this page in step.
 
 > **Scope:** This project covers eBay's **Sell** (plus shared Commerce and Developer)
 > APIs only — see the package description. The Buying Apps specs are intentionally
-> excluded so the sync doesn't download out-of-scope APIs. Add them back here if Buy
-> coverage is ever in scope.
+> excluded so the sync doesn't download out-of-scope APIs (the Browse tools are hand-written,
+> outside the sync). Add Buy specs to `src/scripts/specSources.ts` if Buy coverage is ever in scope.
 
 ---
 

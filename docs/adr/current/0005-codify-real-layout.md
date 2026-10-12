@@ -2,6 +2,14 @@
 
 **Status:** Accepted · 2026-07-02 · `test-endpoints.ts` **deleted** (not deferred) — see [0006](0006-close-style-backlog.md)
 
+> **Status update (2026-10-12):** The principle stands; the layout moved. Upstream
+> #186 renamed `ui/` to `mcp-apps/`, moved the API clients into `src/api/client/`
+> (named after their main export), replaced `src/api/index.ts` with
+> `src/api/ebaySellerApi.ts`, and deleted `ARCHITECTURE.md`, `CONTEXT.md`, and
+> `LANGUAGE.md` upstream. The marlermedia fork keeps those docs, guarded by
+> `tests/unit/forkDocs.test.ts`; the current layout is in
+> [ARCHITECTURE.md](../../../ARCHITECTURE.md).
+
 ## Context
 
 The structure docs described a codebase that doesn't exist. `ARCHITECTURE.md`

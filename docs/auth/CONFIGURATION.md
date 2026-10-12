@@ -15,7 +15,7 @@ This guide provides detailed instructions for configuring the eBay MCP server, i
 
 ## Overview
 
-The eBay MCP server requires configuration through environment variables stored in a `.env` file. These variables control authentication, API endpoints, and token management. The server supports two authentication methods:
+The eBay MCP server is configured through environment variables, either from the MCP client's `env` block or from a `.env` file in the project (package) root. `.env.example` lists every supported variable. These variables control authentication, API endpoints, and token management. The server supports two authentication methods:
 
 1. **Client Credentials Flow** (Default) - Lower rate limits (1,000 requests/day)
 2. **OAuth 2.0 Authorization Code Grant Flow** (Recommended) - Higher rate limits (10,000-50,000 requests/day)
@@ -67,9 +67,28 @@ These credentials are obtained from the [eBay Developer Portal](https://develope
 - **Valid Values:**
   - `sandbox` - For testing and development (recommended for initial setup)
   - `production` - For live eBay marketplace operations
-- **Default:** `sandbox` (if not specified)
-- **Required:** Yes
+- **Default:** `sandbox` (if not specified; the server warns at startup)
+- **Required:** Recommended — any value other than `sandbox` or `production` fails startup validation
 - **Recommendation:** Start with `sandbox` for testing, then switch to `production` when ready
+
+#### `EBAY_OAUTH_SCOPES`
+
+- **Description:** The exact OAuth scopes the consent URL requests, separated by spaces or commas
+- **Required:** No
+- **Default:** every scope in the environment's table in `src/config/oauthScopes.ts` (`productionScopes` or `sandboxScopes`)
+- **Behavior:** Set this to the scope list your keyset shows in the developer portal when consent fails with `invalid_scope` (see [Troubleshooting](#invalid_scope-from-the-authorization-page)). Entries that are not eBay scope URIs are dropped with a startup notice; an empty or unusable value falls back to the default table.
+- **Optional scopes:** these are recognized (see `src/auth/scopeUtils.ts`) but never part of the default table, so they are requested only when listed here:
+  - `https://api.ebay.com/oauth/api_scope/sell.finances.earnings.read` — the order-earnings tools (`ebay_get_order_earnings`, `ebay_get_order_earnings_by_id`, `ebay_get_order_earnings_summary`); eBay grants it only to approved sellers
+  - `https://api.ebay.com/oauth/api_scope/sell.logistics` — the limited-release Logistics tools (shipping quotes, shipments, labels)
+  - `https://api.ebay.com/oauth/api_scope/commerce.post_order.document` — post-order document uploads
+- **Fork note:** this fork's production table omits `commerce.feedback.readonly`. eBay grants that scope only to the client-credentials grant, so requesting it in the authorization-code flow fails the whole consent request with `invalid_scope`. `commerce.feedback` is still requested.
+
+#### `EBAY_OAUTH_CALLBACK_PORT`
+
+- **Description:** Local port for the setup wizard's OAuth auto-capture server (`http://localhost:<port>/oauth/callback`)
+- **Required:** No
+- **Default:** `3000`
+- **Behavior:** Used only by `npm run setup` → "Auto-capture". eBay requires an HTTPS auth-accepted URL, so front this port with an HTTPS tunnel and register the tunnel's URL for your RuName.
 
 #### `EBAY_MARKETPLACE_ID`
 
@@ -131,9 +150,24 @@ These credentials are obtained from the [eBay Developer Portal](https://develope
 - **Default:** unset (`media://` references are refused)
 - **Behavior:** Must be absolute. `..` segments are resolved first, so a reference cannot escape the root.
 
+#### `EBAY_MCP_UI`
+
+- **Description:** MCP Apps interactive views (tables, cards, charts) for read tools
+- **Default:** on — views render only on hosts that advertise MCP Apps support; other hosts get plain JSON
+- **Behavior:** Set `off` to return plain JSON everywhere
+
+#### `EBAY_MCP_API_BASE_URL` / `EBAY_MCP_DISABLE_AUTH_HEADER`
+
+- **`EBAY_MCP_API_BASE_URL`:** Routes all outbound eBay traffic (REST, Identity, Trading) through a reverse proxy at this absolute URL; trailing slashes are trimmed. An invalid URL fails startup validation.
+- **`EBAY_MCP_DISABLE_AUTH_HEADER`:** `true` sends no eBay auth and mints no tokens, so `EBAY_CLIENT_ID` / `EBAY_CLIENT_SECRET` become optional; pair it with `EBAY_MCP_API_BASE_URL` pointing at a proxy that authenticates.
+
+#### `EBAY_LOG_LEVEL` / `EBAY_ENABLE_FILE_LOGGING`
+
+Log level (default `info`) and opt-in file logging to `~/.ebay-mcp/logs/`. Logs always go to stderr so they never corrupt the STDIO protocol. See [Logging](../logging.md).
+
 ### HTTP transport / container deploy (optional)
 
-These variables apply when running the HTTP MCP server (`node build/serverHttp.js` or the Docker image, which uses that entrypoint).
+These variables apply when running the HTTP MCP server (`node build/serverHttp.js`). In this fork the Docker image defaults to the STDIO entrypoint (`build/index.js`) for Claude Desktop; run the image with `node build/serverHttp.js` to serve HTTP, as `scripts/dockerUp.sh` does.
 
 #### `MCP_HOST` / `MCP_PORT` / `PORT`
 
@@ -147,6 +181,16 @@ These variables apply when running the HTTP MCP server (`node build/serverHttp.j
 - **Example:** a long random string
 - **Required:** No
 - **Security:** ⚠️ Keep secret. `/health` remains unauthenticated for probes.
+
+#### `MCP_CORS_ORIGINS`
+
+- **Description:** Comma-separated browser origins allowed to call the HTTP server (exact origins such as `https://app.example.com`)
+- **Default:** unset allows only `localhost`, `127.0.0.1` and `[::1]` on any port
+- **Note:** Desktop and CLI MCP clients do not use CORS and need no entry.
+
+#### `OAUTH_ENABLED` and the `OAUTH_*` verifier settings
+
+Without `MCP_AUTH_TOKEN`, HTTP routes require an OAuth 2.1 bearer token checked against `OAUTH_AUTH_SERVER_URL` (with `OAUTH_CLIENT_ID`, `OAUTH_CLIENT_SECRET`, `OAUTH_REQUIRED_SCOPES`, `OAUTH_USE_INTROSPECTION`). `OAUTH_ENABLED=false` turns that check off — only safe when the port is bound to loopback, as `scripts/dockerUp.sh` does (`-p 127.0.0.1:3000:3000`).
 
 ### Required: User Refresh Token (For OAuth Flow)
 
@@ -298,7 +342,7 @@ Ask your AI assistant to generate an OAuth authorization URL:
 
 - The AI assistant uses the `ebay_get_oauth_url` tool
 - The tool reads your `EBAY_CLIENT_ID`, `EBAY_REDIRECT_URI`, and `EBAY_ENVIRONMENT` from your `.env` file
-- An authorization URL is generated with the appropriate scopes for your environment
+- An authorization URL is generated with the scopes from `EBAY_OAUTH_SCOPES`, or, when that is unset, every scope in your environment's table in `src/config/oauthScopes.ts` (scopes passed to the tool take precedence; unknown ones produce warnings but are still requested)
 
 **Response:**
 The assistant will provide you with:
@@ -328,7 +372,7 @@ After authorization, eBay will redirect you to your redirect URI with an authori
 
 **Important:**
 
-- The authorization code is **short-lived** (typically expires in 10 minutes)
+- The authorization code is **short-lived** (about 5 minutes; the redirect shows `expires_in=299`) and single-use
 - Copy the entire `code` value from the URL
 - If you see the code in the URL fragment (after `#`), make sure to copy everything after `code=`
 
@@ -342,8 +386,8 @@ Provide the authorization code to your AI assistant:
 
 **What Happens:**
 
-- The AI assistant uses the `ebay_set_user_tokens` or `ebay_set_user_tokens_with_expiry` tool
-- Internally, the server calls `exchangeCodeForToken()` method
+- The AI assistant uses the `ebay_exchange_authorization_code` tool (URL-encoded codes are decoded automatically)
+- Internally, the server calls the OAuth client's `exchangeCodeForToken()` method
 - The server exchanges the authorization code for:
   - An **access token** (short-lived, ~2 hours)
   - A **refresh token** (long-lived, ~18 months)
@@ -352,9 +396,9 @@ Provide the authorization code to your AI assistant:
 
 **Automatic Token Persistence:**
 
-- The server automatically saves the `EBAY_USER_REFRESH_TOKEN` to your `.env` file
-- The `EBAY_USER_ACCESS_TOKEN` is also saved (but will be refreshed automatically)
-- You'll see a confirmation message indicating tokens were saved
+- The server writes `EBAY_USER_REFRESH_TOKEN` and `EBAY_USER_ACCESS_TOKEN` back to the project `.env` file (see [Token persistence](#token-persistence))
+- The access token is refreshed automatically after that
+- The tool result confirms the exchange and shows the masked tokens and granted scopes
 
 **Response:**
 The assistant will confirm:
@@ -423,8 +467,8 @@ The assistant will use the `ebay_get_token_status` tool to verify:
        ▼
 ┌─────────────────────────────────┐
 │  AI Assistant                   │
-│  Uses: ebay_set_user_tokens     │
-│  (calls exchangeCodeForToken)   │
+│  Uses: ebay_exchange_           │
+│        authorization_code       │
 └──────┬──────────────────────────┘
        │
        │ 5. Exchanges code for tokens
@@ -453,9 +497,9 @@ The assistant will use the `ebay_get_token_status` tool to verify:
 Once `EBAY_USER_REFRESH_TOKEN` is set in your `.env` file, the server automatically manages access tokens:
 
 1. **On Server Start:**
-   - Server reads `EBAY_USER_REFRESH_TOKEN` from `.env`
-   - Automatically refreshes to get a new access token
-   - Updates `EBAY_USER_ACCESS_TOKEN` in `.env`
+   - Server reads `EBAY_USER_REFRESH_TOKEN` from the environment
+   - Automatically refreshes to get a new access token, then mints an app token
+   - Writes `EBAY_USER_ACCESS_TOKEN` (and `EBAY_APP_ACCESS_TOKEN`) back to `.env`
 
 2. **During API Calls:**
    - Server checks if access token is expired
@@ -466,6 +510,14 @@ Once `EBAY_USER_REFRESH_TOKEN` is set in your `.env` file, the server automatica
 3. **Token Expiry:**
    - **Access Tokens:** Expire after ~2 hours (automatically refreshed)
    - **Refresh Tokens:** Expire after ~18 months (requires re-authorization)
+
+### Token persistence
+
+Token writes go through `DotEnvCredentialStore` (`src/auth/credentialSession.ts`), which merges the updated keys into the `.env` file in the project (package) root, serializes concurrent writes, and fsyncs the file. A refresh token rotated by eBay is written back too.
+
+**Fork change:** when `.env` exists but is not a regular file — for example a read-only named pipe mounted by 1Password Environments — the write is skipped and logged (`Skipping token persistence`), and refreshed tokens live only in memory. Opening such a pipe for writing would otherwise block every refresh. The refresh token is re-read from the pipe on the next start, so nothing is lost.
+
+If a write fails for any other reason, the refreshed token stays usable for the running process, and the server logs that the credential file must be writable to survive a restart.
 
 ### Manual Token Refresh
 
@@ -521,9 +573,10 @@ To clear all stored tokens and start fresh:
 
 The assistant will use the `ebay_clear_tokens` tool to:
 
-- Remove all tokens from memory
-- Clear tokens from `.env` file (optional, depending on implementation)
+- Remove all tokens from memory (the `.env` file is not changed)
 - Require re-authentication for subsequent API calls
+
+To make the change survive a restart, remove `EBAY_USER_REFRESH_TOKEN` from `.env` yourself.
 
 ## Example Configuration
 
@@ -645,7 +698,9 @@ the keyset never received.
 Optional scopes are never part of the published table: `commerce.post_order.document`
 (post-order documents), `sell.finances.earnings.read` (order earnings), and `sell.logistics`
 (the limited-release Logistics API). Add one to `EBAY_OAUTH_SCOPES` only when your keyset was
-granted it, then repeat consent.
+granted it, then repeat consent. The default tables live in `src/config/oauthScopes.ts`; this
+fork already leaves out `commerce.feedback.readonly`, which eBay grants only to the
+client-credentials grant and which therefore always fails the authorization-code flow.
 
 #### "Failed to exchange code for token"
 
@@ -653,7 +708,7 @@ granted it, then repeat consent.
 
 **Common Causes:**
 
-- Authorization code expired (codes expire in ~10 minutes)
+- Authorization code expired (codes expire in about 5 minutes and are single-use)
 - Invalid authorization code
 - Mismatched redirect URI
 - Invalid client credentials
@@ -710,7 +765,8 @@ granted it, then repeat consent.
 1. Verify the `.env` file exists and is writable
 2. Check file permissions (should be readable/writable by the process)
 3. Ensure the `.env` file is in the project root directory
-4. Check server logs for any file write errors
+4. If `.env` is a pipe or other non-regular file (e.g. 1Password Environments), persistence is skipped on purpose — see [Token persistence](#token-persistence)
+5. Check server logs for any file write errors
 
 ### Diagnostic Tools
 
@@ -733,10 +789,12 @@ This interactive tool checks:
 #### Export Diagnostic Report
 
 ```bash
-npm run diagnose:export
+npm run diagnose -- --export
+# or, from an installed package:
+ebay-mcp diagnose --export
 ```
 
-Exports a detailed diagnostic report that you can share when seeking help.
+Runs the same checks and also writes `ebay-mcp-diagnostic-<timestamp>.json` to the project root, which you can share when seeking help.
 
 ### Getting Help
 
@@ -747,7 +805,7 @@ If you're still experiencing issues:
    - Search [GitHub Discussions](https://github.com/YosefHayim/ebay-mcp/discussions)
 
 2. **Create a New Issue:**
-   - Include your diagnostic report (`npm run diagnose:export`)
+   - Include your diagnostic report (`npm run diagnose -- --export`)
    - Provide steps to reproduce the problem
    - Include error messages or logs
    - Specify your environment (OS, Node version, MCP client)
@@ -760,8 +818,8 @@ If you're still experiencing issues:
 - [eBay Developer Portal](https://developer.ebay.com/) - API documentation and credentials
 - [eBay API License Agreement](https://developer.ebay.com/join/api-license-agreement) - Terms of use
 - [eBay Data Handling Requirements](https://developer.ebay.com/api-docs/static/data-handling-update.html) - Data protection guidelines
-- [Main README](../README.md) - Project overview and quick start
-- [OAuth Setup Guide](./) - Additional OAuth documentation
+- [Main README](../../README.md) - Project overview and quick start
+- [OAuth Quick Reference](./OAUTH_QUICK_REFERENCE.md) - OAuth tools, scopes, and common errors
 
 ---
 

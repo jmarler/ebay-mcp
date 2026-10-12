@@ -2,6 +2,14 @@
 
 **Status:** Accepted · 2026-07-02
 
+> **Status update (2026-10-12):** The decision stands. Since then upstream renamed
+> `ui/` to `mcp-apps/` (#186), so the `check`/`fix` scripts now glob
+> `{src,mcp-apps}/**` and the `noArrayIndexKey` warning covers `mcp-apps/*.tsx`.
+> The size-cap override in `biome.json` now lists `src/schemas/**`,
+> `src/tools/categories/**`, `src/types/**`, and `src/scripts/**`
+> (`src/tools/definitions/` no longer exists). #186 also deleted `CODE-STYLE.md`
+> upstream; the marlermedia fork keeps it. Current commands: [AGENTS.md](../../../AGENTS.md).
+
 ## Context
 
 The repo already leaned on Biome (`@biomejs/biome` 2.5.1) but its config was

@@ -44,8 +44,8 @@
 
 - [ ] Unit tests added/updated
 - [ ] Integration tests added/updated
-- [ ] All tests pass locally (`npm test` or `pnpm test`)
-- [ ] Test coverage meets thresholds (90%+ on critical paths)
+- [ ] All tests pass locally (`pnpm test`; `pnpm test:integration` if integration tests changed)
+- [ ] Test coverage meets the thresholds in `vitest.config.ts` (`pnpm test:coverage`)
 
 ### Manual Testing
 
@@ -54,7 +54,7 @@
 **Environment:**
 - eBay Environment: <!-- sandbox / production -->
 - Transport Mode: <!-- STDIO / HTTP -->
-- Node.js Version: <!-- e.g., v18.17.0 -->
+- Node.js Version: <!-- e.g., v20.x or v24.x -->
 - OS: <!-- macOS / Linux / Windows -->
 
 **Test Scenarios:**
@@ -66,20 +66,20 @@
 
 <!-- Check all that apply -->
 
-- [ ] My code follows the style guidelines (ran `npm run format`)
+- [ ] My code follows the style guidelines (ran `pnpm fix`)
 - [ ] I have performed a self-review of my code
 - [ ] I have commented my code, particularly in hard-to-understand areas
 - [ ] I have added/updated JSDoc comments for new functions
 - [ ] My changes generate no new warnings
-- [ ] Linting passes (`npm run lint`)
-- [ ] Type checking passes (`npm run typecheck`)
+- [ ] Biome passes (`pnpm check:ci`)
+- [ ] Type checking passes (`pnpm typecheck` and `pnpm typecheck:mcp-apps`)
+- [ ] Full gate passes (`pnpm verify`)
 
 ## Documentation
 
 <!-- Check all that apply -->
 
 - [ ] I have updated the README.md (if needed)
-- [ ] I have updated CHANGELOG.md with my changes
 - [ ] I have updated relevant documentation files (AGENTS.md, CODE-STYLE.md, CLAUDE.md, etc.)
 - [ ] I have updated JSDoc comments for modified functions
 - [ ] I have updated tool descriptions for new/modified tools
@@ -100,12 +100,10 @@
 <!-- Ensure all items are completed before requesting review -->
 
 - [ ] I have read the [CONTRIBUTING.md](../CONTRIBUTING.md) guidelines
-- [ ] My commits follow the [Conventional Commits](https://www.conventionalcommits.org/) specification
-- [ ] I have updated the version in package.json (if applicable)
+- [ ] The PR title follows the [Conventional Commits](https://www.conventionalcommits.org/) specification (it becomes the squash-merge commit and the release name)
 - [ ] I have added tests that prove my fix is effective or that my feature works
 - [ ] New and existing unit tests pass locally with my changes
 - [ ] I have checked my code and corrected any misspellings
-- [ ] I have verified that my changes work with both npm and pnpm
 
 ## Screenshots / Demos
 

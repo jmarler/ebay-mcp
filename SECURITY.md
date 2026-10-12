@@ -49,21 +49,21 @@ Security vulnerabilities we consider in-scope:
 
 ### Token Security
 
-#### `.env (tokens stored as EBAY_USER_REFRESH_TOKEN)` File
+#### `.env` File
 
-This file contains sensitive OAuth tokens and **MUST** be protected:
+`.env` holds the app credentials and OAuth tokens (`EBAY_USER_REFRESH_TOKEN`, and the server writes refreshed tokens back to it) and **MUST** be protected:
 
 ```bash
 # Set restrictive permissions (Unix/Linux/macOS)
-chmod 600 .env (tokens stored as EBAY_USER_REFRESH_TOKEN)
+chmod 600 .env
 
 # Verify permissions
-ls -l .env (tokens stored as EBAY_USER_REFRESH_TOKEN)
+ls -l .env
 # Should show: -rw------- (owner read/write only)
 ```
 
 **Security Checklist**:
-- ✅ File is in `.gitignore` (already configured)
+- ✅ File is in `.gitignore` (`.env` and `.env.*` are ignored; only `.env.example` is tracked)
 - ✅ Restrictive file permissions (600)
 - ✅ Not committed to version control
 - ✅ Not shared in plain text (email, chat, etc.)
@@ -83,6 +83,8 @@ export EBAY_CLIENT_ID="your_app_id_here"
 # Option 2: System keychain/secrets manager
 # Option 3: CI/CD secrets (GitHub Secrets, etc.)
 ```
+
+**This fork's local Docker setup** keeps credentials in 1Password: `scripts/opSecrets.env` holds only `op://` references, and `scripts/dockerUp.sh` resolves them with `op run` when it starts the container, so no secret is written to disk or committed. Never commit a `.env` file.
 
 #### Token Rotation
 
@@ -106,6 +108,9 @@ OAUTH_USE_INTROSPECTION=true
 
 # Enforce required scopes
 OAUTH_REQUIRED_SCOPES="mcp:tools"
+
+# Or, for a simple private deployment: a static bearer token (skips the OAuth verifier)
+MCP_AUTH_TOKEN="$(openssl rand -base64 32)"
 ```
 
 #### Network Security
@@ -117,14 +122,10 @@ OAUTH_REQUIRED_SCOPES="mcp:tools"
 - ✅ Use secure session management
 - ✅ Enable security headers (HSTS, CSP, etc.)
 
-**Example secure setup**:
-```javascript
-// In src/server-http.ts
-app.use(helmet());  // Security headers
-app.use(cors({
-  origin: 'https://trusted-client.com',  // NOT '*'
-  credentials: true
-}));
+The HTTP transport (`src/mcp/httpTransport.ts`) already applies `helmet` security headers and restricts CORS to loopback origins by default. To allow a browser client, list its exact origins:
+
+```bash
+MCP_CORS_ORIGINS=https://trusted-client.com  # comma-separated; never '*'
 ```
 
 ### Dependency Security
@@ -133,16 +134,13 @@ app.use(cors({
 
 ```bash
 # Check for vulnerabilities
-npm audit
+pnpm audit
 
-# Fix automatically (review changes first!)
-npm audit fix
-
-# Update to latest secure versions
-npm update
+# Update to latest secure versions (review changes first!)
+pnpm update
 
 # Check for outdated packages
-npm outdated
+pnpm outdated
 ```
 
 #### GitHub Security Features
@@ -180,8 +178,8 @@ EBAY_CLIENT_ID="production_app_id"
 **App Token Limits**:
 - All tiers: 1,000 req/day
 
-**Client-side rate limiting** (this MCP server):
-- 5,000 req/min (conservative limit)
+**Client-side rate limiting** (this MCP server, `src/api/client/rateLimitTracker.ts`):
+- 5,000 req/min sliding window (conservative limit)
 - Automatic backoff on 429 responses
 - Exponential retry on 5xx errors
 
@@ -205,15 +203,18 @@ EBAY_CLIENT_ID="production_app_id"
 - Full request/response bodies (may contain tokens)
 ```
 
-#### Debug Mode Security
+#### Verbose Logging Security
 
 ```bash
-# Debug mode may log sensitive data
-EBAY_DEBUG=true  # NEVER use in production
+# http and lower levels log request/response bodies (truncated, with secret-named
+# fields redacted) - they can still contain buyer PII. Avoid in production.
+EBAY_LOG_LEVEL=http
 
 # Production
-EBAY_DEBUG=false  # Default, recommended
+EBAY_LOG_LEVEL=info  # Default, recommended
 ```
+
+See [docs/logging.md](docs/logging.md) for what redaction covers.
 
 ## Security Disclosure Policy
 
@@ -229,7 +230,6 @@ EBAY_DEBUG=false  # Default, recommended
 ### Credit
 
 Security researchers who responsibly disclose vulnerabilities will be credited in:
-- `CHANGELOG.md` security section
 - GitHub Security Advisory
 - Release notes
 
@@ -238,14 +238,14 @@ Security researchers who responsibly disclose vulnerabilities will be credited i
 ### Static Analysis
 
 ```bash
-# ESLint security rules (already configured)
-npm run lint
+# Biome lint and format checks
+pnpm lint
 
 # Type checking (prevents many issues)
-npm run typecheck
+pnpm typecheck
 
 # Dependency audit
-npm audit
+pnpm audit
 ```
 
 ### Runtime Protection
@@ -260,7 +260,7 @@ npm audit
 **Manual** (configure as needed):
 - JWT signature verification (HTTP mode)
 - Token introspection (HTTP mode)
-- Request/response logging (debug mode only)
+- Request/response logging (`EBAY_LOG_LEVEL=http` or lower)
 
 ### Additional Resources
 
