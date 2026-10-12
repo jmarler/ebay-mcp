@@ -2,6 +2,11 @@
 
 **Status:** Accepted · 2026-07-04
 
+> **Status update (2026-10-12):** The outcomes stand with new names: upstream #186
+> renamed `ui/` to `mcp-apps/` and `typecheck:ui` to `typecheck:mcp-apps` (still in
+> the Typecheck gate), and deleted `CODE-STYLE.md` upstream — the marlermedia fork
+> keeps it. See [AGENTS.md](../../../AGENTS.md) for current commands.
+
 ## Context
 
 PR #132 landed `CODE-STYLE.md`, the structure docs, a valid `biome.json`, and a

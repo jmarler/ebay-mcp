@@ -2,6 +2,11 @@
 
 **Status:** Accepted · 2026-07-02 · refreshed 2026-07-06 (commander adoption reversed by [0006](0006-close-style-backlog.md))
 
+> **Status update (2026-10-12):** The command surface stands, and `diagnose` is now
+> routed by the bin (`src/index.ts`). The dev-only `build-ui` step is now
+> `pnpm build:mcp-apps` (`src/scripts/buildMcpApps.ts`, after #186 renamed `ui/` to
+> `mcp-apps/`); `test-endpoints` was deleted in [0006](0006-close-style-backlog.md).
+
 ## Context
 
 The bin (`src/index.ts`) hand-routes `setup` and `skills`, then falls through to

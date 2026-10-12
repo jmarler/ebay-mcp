@@ -6,17 +6,18 @@ Shared repo guidance lives in [AGENTS.md](../AGENTS.md), and full style rules li
 
 - This is a TypeScript/Node.js ESM MCP server for eBay APIs. Keep NodeNext `.js` extensions in imports.
 - Use `@/` aliases for imports outside the current folder; use `./sibling.js` only for same-directory imports.
-- Hand-written source, test, and UI file basenames are camelCase. Generated specs/types and external docs keep upstream names.
+- Hand-written source, test, and MCP Apps (`mcp-apps/`) file basenames are camelCase and named after their main export. Generated specs/types keep upstream names.
+- Use domain names, not generic ones (`data`, `result`, `response`, `item`, `value`, `err`, single letters). Never declare an identifier named `resolve`.
 - New or migrated exports use named `export const ... = (...) =>` functions. Do not add default exports.
-- Do not hand-edit files under `src/types/`; they are generated from eBay OpenAPI specs.
+- Do not hand-edit files under `src/types/`; they are generated from eBay OpenAPI specs by `pnpm sync`.
 
 ## Schema and API patterns
 
-- Tool input schemas are Effect-backed. Import runtime helpers from `@/utils/effectSchema.js` and inference/helper types from `@/utils/effectSchemaTypes.js`.
-- Do not import `zod` directly outside the schema adapter boundary, and do not add compatibility re-export facades.
+- Tool input schemas are Zod: import `z` from `zod` directly and author them under `src/schemas/<family>/` (rules in [src/schemas/README.md](../src/schemas/README.md)). Do not add compatibility re-export facades.
+- Register tools with `defineTool({ inputSchema: <schema>.shape, handler })`; `defineTool` validates args with `safeParse` and throws `ToolInputError`. Endpoint methods decode input with `decodeEndpointInputEffect` (`EndpointInputError`).
 - Fallible API work returns `Effect.Effect<Success, TaggedError, Requirements>`. Run Effects at MCP, HTTP, CLI, or test boundaries.
 - Do not add endpoint/tool `try/catch` when the work can be represented with Effect.
-- Endpoint-backed handlers should validate args, run one endpoint Effect, and return the generated eBay DTO without response reshaping.
+- Endpoint-backed handlers should run one endpoint Effect and return the generated eBay DTO without response reshaping.
 
 ## Documentation and tests
 
@@ -29,9 +30,12 @@ Shared repo guidance lives in [AGENTS.md](../AGENTS.md), and full style rules li
 Use the same gates as `AGENTS.md`:
 
 ```bash
-npm run typecheck
-npm run check:ci
-npm test
-npm run test:integration
-npm run build
+pnpm check:ci
+pnpm typecheck
+pnpm typecheck:mcp-apps
+pnpm test
+pnpm test:integration
+pnpm build
 ```
+
+`pnpm verify` runs all of these except `test:integration`.

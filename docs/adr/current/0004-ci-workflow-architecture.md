@@ -2,6 +2,16 @@
 
 **Status:** Accepted · 2026-07-02 · `ui/` gate follow-up **resolved** by [0006](0006-close-style-backlog.md)
 
+> **Status update (2026-10-12):** The CI Gate shape stands. Changes since:
+> `typecheck.yml` runs `typecheck:mcp-apps` (was `typecheck:ui`, renamed in #186);
+> `api-sync.yml` keeps only the `sync-check` job (the API-status doc updater was
+> deleted in #186); `e2e.yml` exists as a template not wired into `ci.yml`; and
+> `release.yml` changed — `.changeset/` was removed by v1.16.0, and a merged PR to
+> `main` (unless labelled `no-release`) now takes the bump from its `major`/`minor`
+> label (patch otherwise), names the release after the PR title, tags the version
+> without a bump commit, and dispatches `publish.yml`.
+> Current gate commands: [AGENTS.md](../../../AGENTS.md).
+
 ## Context
 
 `.github/workflows/` had grown ad-hoc: `ci.yml` ran **tests only** (no

@@ -11,7 +11,7 @@ Issues and PRDs for this repo live as GitHub issues in `YosefHayim/ebay-mcp`. Us
 - **Apply / remove labels**: `gh issue edit <number> --add-label "..."` / `--remove-label "..."`
 - **Close**: `gh issue close <number> --comment "..."`
 
-Infer the repo from `git remote -v`; `gh` does this automatically when run inside this clone.
+In this fork's clone, `git remote -v` lists two GitHub repos (`origin` = `YosefHayim/ebay-mcp`, `fork` = `jmarler/ebay-mcp`) and no `gh` default repo is set, so pass `--repo YosefHayim/ebay-mcp` explicitly. The fork has GitHub issues disabled; fork-only work is tracked on the `marlermedia` branch, not in issues.
 
 ## When a skill says "publish to the issue tracker"
 

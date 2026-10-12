@@ -19,6 +19,8 @@ This document provides guidelines for contributing to this project. Following th
   - [TypeScript Style Guide](#typescript-style-guide)
   - [Documentation Style Guide](#documentation-style-guide)
 - [Testing Guidelines](#testing-guidelines)
+- [Releases](#releases)
+- [This Fork (marlermedia)](#this-fork-marlermedia)
 - [Community](#community)
 
 ## Code of Conduct
@@ -86,15 +88,15 @@ Unsure where to begin? Look for issues labeled:
 1. **Fork the repository** and create your branch from `main`
 2. **Make your changes** following our style guidelines
 3. **Add tests** for any new functionality
-4. **Ensure tests pass** - Run `npm test` or `pnpm test`
-5. **Update documentation** - Update README, CHANGELOG, or related docs
-6. **Follow commit conventions** - Use [Conventional Commits](https://www.conventionalcommits.org/)
+4. **Ensure checks pass** - Run `pnpm verify` (Biome CI, both typechecks, tests, build)
+5. **Update documentation** - Update README or related docs when behavior changes
+6. **Follow commit conventions** - Use [Conventional Commits](https://www.conventionalcommits.org/), especially for the PR title
 7. **Submit a pull request** using our PR template
 
 **Pull Request Process:**
 
-1. Update the CHANGELOG.md with details of your changes
-2. Ensure all tests pass and coverage thresholds are met (90%+)
+1. Give the PR a Conventional Commit title - PRs are squash-merged, and the title becomes the commit on `main` and the release name (see [Releases](#releases))
+2. Ensure CI passes, including coverage thresholds
 3. Update documentation to reflect any API changes
 4. The PR will be merged once it receives approval from a maintainer
 
@@ -102,8 +104,8 @@ Unsure where to begin? Look for issues labeled:
 
 ### Prerequisites
 
-- **Node.js** >= 18.0.0
-- **npm** or **pnpm** (both supported)
+- **Node.js** >= 20.0.0
+- **pnpm** 10.14.0 (pinned in `package.json` `packageManager`; npm also works for running scripts)
 - **Git**
 - **eBay Developer Account** (for API credentials)
 
@@ -117,8 +119,6 @@ Unsure where to begin? Look for issues labeled:
 
 2. **Install dependencies**:
    ```bash
-   npm install
-   # or
    pnpm install
    ```
 
@@ -128,63 +128,70 @@ Unsure where to begin? Look for issues labeled:
    # Edit .env with your eBay credentials
    ```
 
-4. **Build the project**:
+4. **Build the project** (TypeScript plus the MCP Apps UI bundles):
    ```bash
-   npm run build
+   pnpm build
    ```
 
 5. **Run tests**:
    ```bash
-   npm test
+   pnpm test
    ```
 
 ### Development Workflow
 
 ```bash
 # Start development server (STDIO mode)
-npm run dev
+pnpm dev
 
 # Start development server (HTTP mode with OAuth)
-npm run dev:http
+pnpm exec tsx src/serverHttp.ts
 
-# Watch mode for TypeScript compilation
-npm run watch
+# Run unit tests in watch mode
+pnpm exec vitest
 
-# Run tests in watch mode
-npm run test:watch
+# Run the hermetic integration suite
+pnpm test:integration
 
-# Run tests with UI dashboard
-npm run test:ui
+# Check code quality (both typechecks + Biome on src/ and mcp-apps/)
+pnpm check
 
-# Check code quality (type check + lint + format)
-npm run check
+# Full pre-PR gate (Biome CI, typechecks, tests, build)
+pnpm verify
 
-# Format code
-npm run format
+# Auto-fix lint and formatting
+pnpm fix
 
-# Generate types from OpenAPI specs
-npm run generate:types
+# Download eBay OpenAPI specs, regenerate types, and report endpoint coverage
+pnpm sync
 ```
 
 ### Project Structure
 
 ```
 src/
-├── api/              # eBay API implementations
-│   ├── client.ts     # HTTP client with interceptors
-│   ├── index.ts      # API facade
-│   └── [domain]/     # API categories (account, inventory, etc.)
-├── auth/             # OAuth & token management
-├── tools/            # MCP tool definitions
-├── types/            # TypeScript types & enums
-├── schemas/          # Zod validation schemas
-├── utils/            # Shared utilities
-└── config/           # Environment configuration
+├── index.ts              # STDIO entry point
+├── serverHttp.ts         # HTTP entry point
+├── api/                  # eBay API implementations
+│   ├── client/           # REST client (ebayApiClient.ts), Trading client, rate limits
+│   ├── ebaySellerApi.ts  # EbaySellerApi facade
+│   └── [domain]/         # API categories (account-management, listing-management, ...)
+├── auth/                 # OAuth & token management
+├── config/               # Environment, OAuth scopes, tool families
+├── mcp/                  # Runtime, tool gating, HTTP transport, MCP Apps bridge
+├── tools/                # MCP tool definitions (defineTool, categories/)
+├── types/                # TypeScript types & enums
+├── schemas/              # Zod validation schemas
+├── scripts/              # setup, sync, diagnose, skills, MCP Apps build
+├── skills/               # Agent skill installer
+└── utils/                # Shared utilities
+
+mcp-apps/                 # MCP Apps UI views (built to build/ui/*.html)
 
 tests/
-├── unit/             # Unit tests
-├── integration/      # Integration tests
-└── helpers/          # Test utilities
+├── unit/                 # Unit tests
+├── integration/          # Integration tests
+└── helpers/              # Test utilities
 ```
 
 ## Style Guidelines
@@ -225,16 +232,17 @@ chore(deps): update @modelcontextprotocol/sdk to 1.21.1
 
 - **Use TypeScript strict mode** - All code must compile with strict checks enabled
 - **Prefer types over interfaces** - Use `type` for most type definitions
-- **Use native enums** - Import from `@/types/ebay-enums.js` when available
+- **Use native enums** - Import from `@/types/ebayEnums.js` when available
 - **Include JSDoc comments** - Document complex functions and types
 - **Use path aliases** - Import using `@/` prefix
 - **Include file extensions** - Use `.js` extension in imports (ES modules)
-- **Validate inputs** - Use Zod schemas for all external inputs
+- **Validate inputs** - Use Zod schemas for all external inputs (see `src/schemas/README.md`)
+- **Name things for what they hold** - No generic names (`data`, `result`, `response`, `item`, `e`/`err`, single letters); files are named after their main export
 
 **Code Example:**
 ```typescript
 import { z } from 'zod';
-import { MarketplaceId } from '@/types/ebay-enums.js';
+import { MarketplaceId } from '@/types/ebayEnums.js';
 
 /**
  * Get inventory item by SKU
@@ -242,8 +250,8 @@ import { MarketplaceId } from '@/types/ebay-enums.js';
  * @returns The inventory item details
  */
 async getInventoryItem(sku: string): Promise<unknown> {
-  const validated = getInventoryItemSchema.parse({ sku });
-  return this.client.get(`/sell/inventory/v1/inventory_item/${sku}`);
+  const { sku: validSku } = getInventoryItemSchema.parse({ sku });
+  return this.client.get(`/sell/inventory/v1/inventory_item/${validSku}`);
 }
 
 const getInventoryItemSchema = z.object({
@@ -257,7 +265,7 @@ const getInventoryItemSchema = z.object({
 - **Include code examples** - Show usage with real examples
 - **Keep README updated** - Reflect all major changes in README.md
 - **Locale READMEs** - `README.md` (English) is the source of truth for product claims (tool families, decommissions, version notes). Update locale files (`README.*.md`) when those claims change, or add a short note that English leads until translation catches up.
-- **Update CHANGELOG** - Document all changes in CHANGELOG.md
+- **No CHANGELOG edits** - Release notes are generated from commits; `CHANGELOG.md` is historical
 - **Use Markdown** - Follow GitHub-flavored Markdown conventions
 - **Include links** - Link to relevant documentation and resources
 
@@ -265,10 +273,11 @@ const getInventoryItemSchema = z.object({
 
 ### Test Coverage Requirements
 
-- **Minimum coverage**: 90% on critical paths
-- **Function coverage**: 91%+
-- **Line coverage**: 83%+
-- **Branch coverage**: 71%+
+`pnpm test:coverage` enforces the thresholds in `vitest.config.ts`:
+
+- **Function coverage**: 90%+
+- **Line / statement coverage**: 75%+
+- **Branch coverage**: 65%+
 
 ### Writing Tests
 
@@ -281,14 +290,15 @@ const getInventoryItemSchema = z.object({
 **Test Example:**
 ```typescript
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { EbayInventoryApi } from '@/api/listing-management/inventory.js';
+import { InventoryApi } from '@/api/listing-management/inventory.js';
 
-describe('EbayInventoryApi', () => {
-  let inventoryApi: EbayInventoryApi;
+describe('InventoryApi', () => {
+  let inventoryApi: InventoryApi;
+  let mockClient: ReturnType<typeof createMockClient>;
 
   beforeEach(() => {
-    const mockClient = createMockClient();
-    inventoryApi = new EbayInventoryApi(mockClient);
+    mockClient = createMockClient();
+    inventoryApi = new InventoryApi(mockClient);
   });
 
   describe('getInventoryItem', () => {
@@ -298,9 +308,9 @@ describe('EbayInventoryApi', () => {
 
       mockClient.get.mockResolvedValue(mockItem);
 
-      const result = await inventoryApi.getInventoryItem(sku);
+      const inventoryItem = await inventoryApi.getInventoryItem(sku);
 
-      expect(result).toEqual(mockItem);
+      expect(inventoryItem).toEqual(mockItem);
       expect(mockClient.get).toHaveBeenCalledWith(
         `/sell/inventory/v1/inventory_item/${sku}`
       );
@@ -318,18 +328,32 @@ describe('EbayInventoryApi', () => {
 ### Running Tests
 
 ```bash
-# Run all tests
-npm test
+# Run unit tests
+pnpm test
 
 # Run with coverage
-npm run test:coverage
+pnpm test:coverage
+
+# Run integration tests
+pnpm test:integration
 
 # Run in watch mode
-npm run test:watch
-
-# Run with UI dashboard
-npm run test:ui
+pnpm exec vitest
 ```
+
+## Releases
+
+There are no changesets and no version-bump commits. When a PR is merged to `main`, `.github/workflows/release.yml`:
+
+1. Skips the release if the PR carries the `no-release` label
+2. Bumps the version from the latest `v*` tag: `major` or `minor` PR labels choose that bump, otherwise it is a patch
+3. Runs typecheck, tests, and build
+4. Pushes the new tag (the version lives in the tag, not in `package.json` on `main`) and creates a GitHub Release named after the PR title, with notes built from the commit log
+5. Triggers `.github/workflows/publish.yml` to publish to npm
+
+## This Fork (marlermedia)
+
+This repository is a fork of [YosefHayim/ebay-mcp](https://github.com/YosefHayim/ebay-mcp). `main` mirrors upstream exactly; fork-only work lands on the `marlermedia` branch. Fixes that would help upstream users can also be offered upstream as PRs against `main` there.
 
 ## Community
 
@@ -343,8 +367,7 @@ npm run test:ui
 
 Contributors are recognized in the following ways:
 
-- Listed in CHANGELOG.md for their contributions
-- Mentioned in release notes
+- Mentioned in release notes (generated from commit history)
 - Added to GitHub contributors list
 
 Thank you for contributing! Your efforts help make this project better for everyone. 🚀

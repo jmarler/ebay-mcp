@@ -5,6 +5,112 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Fork (marlermedia)
+
+This is the `marlermedia` fork of [YosefHayim/ebay-mcp](https://github.com/YosefHayim/ebay-mcp).
+`main` mirrors upstream exactly; the `marlermedia` branch carries the changes below on top of
+the latest upstream release (currently v1.18.3) and is re-applied on each upstream catch-up.
+Upstream no longer keeps a changelog (each merged PR is tagged as a release by `release.yml`), so the fork
+records both its own changes and an upstream summary here.
+
+Fork changes, newest first:
+
+- **2026-10-12** — Restore the contributor and agent docs upstream deleted in #186 (root
+  markdown files and `docs/`), updated to the current code, and guard them with
+  `tests/unit/forkDocs.test.ts`, which fails on links to missing files, stale backticked repo
+  paths, and package scripts that no longer exist.
+- **2026-10-11** — `scripts/dockerUp.sh` recreates the local Docker container with credentials
+  resolved from 1Password by `op run` (`scripts/opSecrets.env` holds only `op://` references).
+  A failed 1Password lookup leaves the running container untouched.
+- **2026-10-11** — Token write-back skips `.env` when it is not a regular file (for example a
+  1Password Environments named pipe), which would otherwise block every refresh; tokens stay in
+  memory and the refresh token is re-read at start (`src/auth/credentialSession.ts`).
+- **2026-10-11** — The MCP Apps order table and order card show eBay fees
+  (`totalMarketplaceFee`), and `ebay_get_orders` points at `ebay_get_transactions` for the
+  per-fee breakdown and net proceeds.
+- **2026-10-11** — The `ebay_get_orders` filter example uses full ISO 8601 UTC timestamps for
+  `creationdate`, and notes eBay's ~90-day default window and two-year limit.
+- **2026-10-11** — Fulfillment-policy guidance points at `ebay_get_shipping_services` (Metadata
+  API) for valid shipping service codes, since eBay is retiring Trading GeteBayDetails. The
+  fork's own copy of those Metadata shipping tools was dropped in favour of upstream's (same
+  names).
+- **2026-08-26** — Dockerfile pins pnpm to 10.14.0 so `--frozen-lockfile` matches the lockfile,
+  and defaults `CMD` to the STDIO transport (`build/index.js`) for Claude Desktop; HTTP deploys
+  override it with `node build/serverHttp.js`.
+- **Carried since v1.17.0** (re-applied 2026-09-30):
+  - Production OAuth scopes omit `commerce.feedback.readonly`: eBay grants it only to the
+    client-credentials grant, so requesting it fails the authorization-code flow with
+    `invalid_scope`.
+  - Taxonomy `ebay_get_item_aspects_for_category` takes `requiredOnly` and `maxValuesPerAspect`
+    (default 10) to trim its very large response.
+  - Trading `ebay_get_active_listings` returns a compact view by default; `fields` picks specific
+    Item fields, and `fields: ["all"]` returns the raw response.
+  - Analytics traffic-report guidance: `sort` must be a metric, never a dimension.
+  - Inventory generated body schemas advertise `type: object`, so MCP hosts send bodies as
+    objects rather than JSON strings eBay rejects.
+
+## 1.18.3 / 1.18.0 (upstream)
+
+Upstream changes since v1.17.0, summarised from `git log v1.17.0..v1.18.3`. The detailed 1.18.0
+entry below lists the new tools; upstream wrote no entries for 1.18.2 or 1.18.3.
+
+### Features
+
+- **Finances API** (1.18.0): 11 read-only tools for payouts, transactions, transfers, seller
+  funds, billing activity, and order earnings. The order-earnings tools need the optional
+  `sell.finances.earnings.read` scope, added through `EBAY_OAUTH_SCOPES`.
+- **Feed API** (1.18.0): 23 tools for order, inventory, and customer-service-metric report
+  tasks, upload tasks, and schedules, including local feed-file uploads (up to 15 MiB, from
+  `EBAY_MCP_MEDIA_DIRS` / `EBAY_MCP_MEDIA_ROOT` only).
+- **Stores API** (1.18.0): 8 tools for store details and asynchronous category changes.
+- **Logistics API** (1.18.0): 6 tools for shipping quotes, shipments, and labels; limited
+  release behind the optional `sell.logistics` scope.
+- **Account API v2** (1.18.0): 14 tools for rate tables, split payouts, combined shipping
+  rules, and user preferences.
+- **Metadata shipping tools** (1.18.0): shipping carriers, services, locations, and handling
+  times from the Metadata API, replacing the retiring Trading GeteBayDetails call.
+- **Taxonomy and Charity** (1.18.0): expired categories, the bulk item-aspects download, and
+  charity organization lookup/search.
+- New `EBAY_MCP_TOOLS` families `finances`, `feed`, `stores`, and `logistics`.
+- File downloads (feed files, labels, the aspect export) return as embedded MCP resources,
+  capped at 25 MiB; nothing is written to disk.
+- The REST client supports PATCH, optional DELETE bodies, and response headers on every verb.
+- Coverage: **384 tools across 360 endpoints**.
+
+### Fixes
+
+- Finances, Feed, Account v2, and Stores inputs are validated against eBay's documented limits
+  before any request (page sizes, required summary filters, conflicting Feed list filters,
+  no-op schedule updates, whole-number split-payout percentages, 35-character store category
+  names); Feed uploads accept XML with long leading whitespace.
+- Download byte caps apply to every HTTP verb, and downloads keep file names that carry an
+  RFC 5987 language tag.
+- `pnpm sync` types dangling spec references as unknown instead of aborting, keeps valid
+  nested references, and prints the underlying error when type generation fails.
+- Binary request and response bodies are logged by size only.
+- `.env` writes quote values so dotenv reads them back unchanged (1.18.2).
+- The CLI entry check works when the binary is launched through a symlink (1.18.2).
+- Security (1.18.2): logs redact URL credentials and secret-named fields, and the HTTP server's
+  CORS policy is an allowlist (`MCP_CORS_ORIGINS`, default loopback origins only).
+- Release workflow (1.18.2, 1.18.3): releases push only a tag and start the publish workflow
+  for it, and the PR title reaches release scripts through an environment variable, closing a
+  script-injection hole.
+
+### Refactors and repo changes (1.18.2, #186)
+
+- Validation is Zod only: the Effect Schema adapter is gone, and invalid tool or endpoint input
+  fails with readable `ToolInputError` / `EndpointInputError` messages. The advertised tool
+  schemas are unchanged.
+- OAuth scope tables moved from `docs/auth/*.json` to `src/config/oauthScopes.ts`; `pnpm sync`
+  reads spec URLs from `src/scripts/specSources.ts` and caches downloads in `.cache/ebay-specs/`.
+- `ui/` is now `mcp-apps/` (`build:mcp-apps`, `typecheck:mcp-apps`), and the API client files
+  live under `src/api/client/` with the `EbaySellerApi` facade in `src/api/ebaySellerApi.ts`.
+- Generic local names (`data`, `result`, `resolve`, ...) were replaced with domain names; a
+  test bans declarations named `resolve`.
+- Every root markdown file except README.md, plus `docs/` and `.changeset/`, was deleted
+  upstream; releases now take the version bump from the PR's `major`/`minor` label (patch
+  otherwise) and are named after the PR title (the fork restores the docs, see above).
+
 ## [Unreleased]
 
 ## [1.18.0] - 2026-10-02

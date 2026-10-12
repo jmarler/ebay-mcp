@@ -9,7 +9,7 @@ This is a single-context repo.
 Before exploring, read these if they exist:
 
 - `CONTEXT.md` at the repo root
-- `docs/adr/` for architectural decisions that touch the area being changed
+- `docs/adr/current/` for architectural decisions that touch the area being changed
 
 If these files do not exist, proceed silently. Do not suggest creating them upfront. Producer skills create them lazily when terms or decisions actually get resolved.
 
@@ -18,9 +18,9 @@ If these files do not exist, proceed silently. Do not suggest creating them upfr
 ```text
 /
 ├── CONTEXT.md
-├── docs/adr/
-│   ├── 0001-example-decision.md
-│   └── 0002-example-decision.md
+├── docs/adr/current/
+│   ├── 0001-formatter-biome.md
+│   └── 0002-cli-command-surface.md
 └── src/
 ```
 

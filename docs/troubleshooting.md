@@ -1,6 +1,6 @@
 # Troubleshooting
 
-Run `npm run diagnose` first — it checks most of the issues below automatically.
+Run `pnpm diagnose` (or `npx ebay-mcp diagnose`) first — it checks most of the issues below automatically. `pnpm diagnose` runs the compiled script, so run `pnpm build` once beforehand in a source checkout.
 
 ## Common issues
 
@@ -22,7 +22,7 @@ The eBay MCP server doesn't show up in Claude Desktop (or another client).
 2. Confirm you're using the right environment (sandbox vs production).
 3. Check your app keys are active in the [eBay Developer Portal](https://developer.ebay.com/my/keys).
 4. For user tokens, verify `EBAY_USER_REFRESH_TOKEN` is valid.
-5. Run `npm run diagnose`.
+5. Run `pnpm diagnose`.
 
 ### Rate limit errors
 
@@ -38,23 +38,26 @@ The eBay MCP server doesn't show up in Claude Desktop (or another client).
 1. Verify the correct environment (sandbox vs production).
 2. Ensure you have the right scopes/permissions for the operation.
 3. Check API health with the `ebay_get_api_status` tool or the [eBay API Status](https://developer.ebay.com/support/api-status) page.
-4. Run `npm run diagnose`.
-5. Review the [eBay API docs](https://developer.ebay.com/docs) for the endpoint's requirements.
+4. If a tool is missing entirely, check `EBAY_MCP_TOOLS` (a family list registers only those families) and `EBAY_READ_ONLY` (registers only read-only tools).
+5. `ebay_get_order_earnings*` tools need the optional `sell.finances.earnings.read` scope: add it to `EBAY_OAUTH_SCOPES` and repeat user consent.
+6. Run `pnpm diagnose`.
+7. Review the [eBay API docs](https://developer.ebay.com/docs) for the endpoint's requirements.
 
 ## Diagnostics
 
 ```bash
-npm run diagnose          # Interactive diagnostics
-npm run diagnose:export   # Export a diagnostic report
+pnpm diagnose               # Run diagnostics
+pnpm diagnose --export      # Also write a JSON report (ebay-mcp-diagnostic-<timestamp>.json; the path is printed)
+npx ebay-mcp diagnose -e    # Same, from the published package
 ```
 
-The diagnostic tool checks environment variable configuration, eBay API connectivity, authentication status, token validity, and available scopes/permissions.
+The diagnostic tool shows system info and update status, runs security checks, validates the setup, checks environment variable configuration, detected MCP clients, eBay API connectivity, authentication, and token scopes.
 
 ## Getting help
 
 If you're still stuck, [open an issue](https://github.com/YosefHayim/ebay-mcp/issues) with:
 
-- Your diagnostic report (`npm run diagnose:export`)
+- Your diagnostic report (`pnpm diagnose --export`; review it and redact anything sensitive first)
 - Steps to reproduce
 - Error messages or logs
 - Your environment (OS, Node version, MCP client)

@@ -1,39 +1,40 @@
 # eBay MCP Server - OAuth Authentication Quick Reference
 
+For every environment variable and the full walkthrough, see the [Configuration Guide](./CONFIGURATION.md).
+
 ## OAuth URL Format
-Use this CLEAN format (no excessive URL encoding):
+`ebay_get_oauth_url` builds the URL for you. Its shape:
 ```
-https://auth.ebay.com/oauth2/authorize?client_id=YOUR_CLIENT_ID&response_type=code&redirect_uri=YOUR_REDIRECT_URI&scope=SCOPES_SEPARATED_BY_PLUS
+https://auth.ebay.com/oauth2/authorize?client_id=YOUR_CLIENT_ID&redirect_uri=YOUR_RUNAME&response_type=code&scope=SCOPES_SEPARATED_BY_SPACES
 ```
+- Sandbox uses `https://auth.sandbox.ebay.com` instead.
+- `redirect_uri` is your **RuName** (`EBAY_REDIRECT_URI`), never a URL. A URL here makes eBay answer `temporarily_unavailable`.
+- Scopes are space-separated: the server encodes the separator as `%20`; `+` also works. Never use `%2B`.
 
-## Common Scopes
-**Basic scope (required):**
-- `https://api.ebay.com/oauth/api_scope`
+## Scopes
+**Where the defaults come from:** with no `scopes` argument and no `EBAY_OAUTH_SCOPES`, the consent URL requests every scope in the environment's table in `src/config/oauthScopes.ts` (`productionScopes` or `sandboxScopes`). The old `docs/auth/*_scopes.json` files no longer exist.
 
-**For inventory/listing management:**
-- `https://api.ebay.com/oauth/api_scope/sell.inventory`
-- `https://api.ebay.com/oauth/api_scope/sell.inventory.readonly`
+**Override:** set `EBAY_OAUTH_SCOPES` (space- or comma-separated) to the exact scope list your keyset shows in the developer portal. Use this when consent fails with `invalid_scope`, because several published scopes are limited release.
 
-**For account management:**
-- `https://api.ebay.com/oauth/api_scope/sell.account`
-- `https://api.ebay.com/oauth/api_scope/sell.account.readonly`
+**Optional scopes** (recognized but never requested by default; add them to `EBAY_OAUTH_SCOPES` only if your keyset was granted them, then repeat consent):
+- `https://api.ebay.com/oauth/api_scope/sell.finances.earnings.read`: `ebay_get_order_earnings`, `ebay_get_order_earnings_by_id`, `ebay_get_order_earnings_summary`
+- `https://api.ebay.com/oauth/api_scope/sell.logistics`: the Logistics tools (`ebay_create_shipping_quote`, `ebay_get_shipment`, `ebay_download_shipping_label_file`, ...)
+- `https://api.ebay.com/oauth/api_scope/commerce.post_order.document`: post-order document tools
 
-**For order fulfillment:**
-- `https://api.ebay.com/oauth/api_scope/sell.fulfillment`
-- `https://api.ebay.com/oauth/api_scope/sell.fulfillment.readonly`
+The tool-to-scope mapping lives in `src/auth/scopeUtils.ts`.
 
-**For marketing:**
-- `https://api.ebay.com/oauth/api_scope/sell.marketing`
-- `https://api.ebay.com/oauth/api_scope/sell.marketing.readonly`
+**Fork note:** the production table omits `commerce.feedback.readonly`. eBay grants it only under the client-credentials grant, so requesting it in the authorization-code flow fails the whole consent request with `invalid_scope`.
 
-**For analytics:**
-- `https://api.ebay.com/oauth/api_scope/sell.analytics.readonly`
+**Common scopes:**
+- Basic (always included): `https://api.ebay.com/oauth/api_scope`
+- Inventory: `.../sell.inventory`, `.../sell.inventory.readonly`
+- Account: `.../sell.account`, `.../sell.account.readonly`
+- Fulfillment: `.../sell.fulfillment`, `.../sell.fulfillment.readonly`
+- Marketing: `.../sell.marketing`, `.../sell.marketing.readonly`
+- Analytics: `.../sell.analytics.readonly`
+- Finances (payouts, transactions, billing activity): `.../sell.finances`
 
-**Multi-scope example:**
-```
-scope=https://api.ebay.com/oauth/api_scope+https://api.ebay.com/oauth/api_scope/sell.inventory+https://api.ebay.com/oauth/api_scope/sell.inventory.readonly
-```
-(Note: Use `+` to separate multiple scopes, NOT `%2B`)
+(`...` = `https://api.ebay.com/oauth/api_scope`)
 
 ## Authentication Flow
 
@@ -44,9 +45,9 @@ ebay:ebay_get_oauth_url
 ```
 
 Optional parameters:
-- `scopes`: Array of specific scopes needed (see Common Scopes above)
+- `scopes`: Array of specific scopes. Scopes eBay does not list for the environment produce warnings but are still requested.
 - `state`: CSRF protection token (optional)
-- `redirectUri`: Override default redirect URI (optional)
+- `redirectUri`: Override the default RuName (optional)
 
 ### Step 2: User Authorization
 1. Open the generated OAuth URL in a browser
@@ -71,8 +72,10 @@ The tool will automatically:
 - Decode URL-encoded codes
 - Exchange the code for access & refresh tokens
 - Store tokens in memory for immediate use
-- Save refresh token to `.env` file for persistence
-- Tokens will auto-refresh when expired
+- Write `EBAY_USER_REFRESH_TOKEN` and `EBAY_USER_ACCESS_TOKEN` to the project `.env` file (see Token Persistence below)
+- Refresh the access token automatically when it expires
+
+Alternatively, `npm run setup` runs the same flow as an interactive wizard (paste the code, or auto-capture it on `EBAY_OAUTH_CALLBACK_PORT` behind an HTTPS tunnel).
 
 ## Token Management
 
@@ -89,6 +92,10 @@ The tool will automatically:
   - User changing password
   - User revoking application access
   - Token expiration
+
+### Token Persistence
+- `DotEnvCredentialStore` (`src/auth/credentialSession.ts`) merges token updates into the `.env` file in the project root on exchange, refresh, and app-token minting.
+- **Fork change:** if `.env` exists but is not a regular file (e.g. a 1Password Environments named pipe), the write is skipped and logged; tokens stay in memory and the refresh token is re-read at the next start.
 
 ### Checking Token Status
 ```
@@ -110,7 +117,7 @@ Manually refresh access token using stored refresh token (useful for testing).
 ```
 ebay:ebay_clear_tokens
 ```
-Clears all stored tokens (requires re-authentication).
+Clears all tokens from memory (requires re-authentication). `.env` is not changed; remove `EBAY_USER_REFRESH_TOKEN` there to make it stick across restarts.
 
 ## Important Notes
 
@@ -127,7 +134,7 @@ Clears all stored tokens (requires re-authentication).
 
 ### Production vs Sandbox
 - Different scopes available in production vs sandbox environments
-- Production has more comprehensive scope coverage
+- Sandbox adds Buy API and extended Identity scopes; production adds eDelivery, messaging, and shipping scopes
 - Set environment via `EBAY_ENVIRONMENT` in `.env` file
 
 ### Rate Limits
@@ -138,14 +145,14 @@ Clears all stored tokens (requires re-authentication).
 ## Troubleshooting
 
 ### "Unexpected end of JSON" errors in Claude Desktop
-**Cause:** Console.log/console.error statements in server code write to stdout and corrupt MCP JSON protocol responses.
+**Cause:** Anything written to stdout corrupts the MCP STDIO protocol.
 
-**Solution:** All console output in the auth flow has been silenced. If you add new auth-related code, avoid console.log/console.error statements.
+**Solution:** The server's logger writes every level to stderr (see [Logging](../logging.md)). If you add new code, log through it and never use `console.log`.
 
 ### "Invalid scope" errors
+- The consent URL named a scope your keyset was not granted (several published scopes are limited release)
+- Set `EBAY_OAUTH_SCOPES` to the scope list your keyset shows in the developer portal and re-run consent
 - Some scopes are only available in production or sandbox (not both)
-- Use the basic scope if unsure: `https://api.ebay.com/oauth/api_scope`
-- Add specific scopes incrementally based on API endpoints you need
 
 ### "Invalid authorization code" errors
 - Code expired (5 minute limit)
@@ -156,13 +163,14 @@ Clears all stored tokens (requires re-authentication).
 ### Empty inventory/offers after successful auth
 - Authentication can succeed even with 0 items
 - Inventory API uses different data model than legacy Trading API
-- Legacy listings may not appear in Inventory API
+- Legacy listings may not appear in Inventory API; use `ebay_get_active_listings` (Trading API) for those
 - Check if you're using the right API for your listing type
 
 ### Tokens not persisting between sessions
 - Verify `.env` file contains `EBAY_USER_REFRESH_TOKEN`
 - Check file permissions on `.env`
 - Ensure MCP server has write access to project directory
+- A non-regular `.env` (pipe, secrets-manager mount) is never written to; keep the refresh token in the secrets manager instead
 
 ## Advanced Usage
 
@@ -183,6 +191,9 @@ Check if tokens are expired or expiring soon, get recommendations.
 ebay:ebay_display_credentials
 ```
 Shows all configuration (masked secrets) for debugging authentication issues.
+
+### Diagnostics
+`npm run diagnose` checks configuration, connectivity, authentication, and the scopes on your token; `npm run diagnose -- --export` also writes a JSON report.
 
 ## Best Practices
 
@@ -218,6 +229,7 @@ code: "v^1.1#i^1#r^1#..." // From redirect URL
 
 ## References
 
+- [Configuration Guide](./CONFIGURATION.md)
 - [eBay OAuth Documentation](https://developer.ebay.com/api-docs/static/oauth-tokens.html)
 - [eBay OAuth Scopes](https://developer.ebay.com/api-docs/static/oauth-scopes.html)
 - [eBay Developer Program](https://developer.ebay.com/)

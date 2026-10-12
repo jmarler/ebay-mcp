@@ -9,14 +9,16 @@ work and close it in the same ownership slice.
 
 ## Stack & Framework Practices
 
-This repo is TypeScript/Node ESM, MCP SDK, Effect, a Zod compatibility adapter,
-Biome, Vitest, and a small MCP Apps React surface.
+This repo is TypeScript/Node ESM, MCP SDK, Effect, Zod, Biome, Vitest, and a
+small MCP Apps React surface in `mcp-apps/`.
 
 - MCP tools/transports -> [Model Context Protocol](https://modelcontextprotocol.io)
   and `@modelcontextprotocol/sdk`.
 - Effect programs/errors -> [Effect documentation](https://effect.website/docs).
-- eBay endpoint behavior -> each generated OpenAPI file plus the matching
-  official eBay endpoint URL.
+- Input validation -> [Zod](https://zod.dev); Effect is for async work and typed
+  errors, not schemas.
+- eBay endpoint behavior -> eBay's OpenAPI specs (`pnpm sync` caches them in
+  `.cache/ebay-specs/`) plus the matching official eBay endpoint URL.
 
 This guide covers repo-specific rules on top of those sources.
 
@@ -25,15 +27,16 @@ This guide covers repo-specific rules on top of those sources.
 ### Function Form And Exports · [lint: style/noDefaultExport]
 
 Use exported `const` arrow functions for new/migrated exported functions. Keep
-named exports only. Existing API area classes may stay classes, but new endpoint
-methods should be public arrow properties so the method shape matches the
-exported-function style. Tool-loader config files may use `module.exports` only
-when the tool cannot load a named export; do not use default exports.
+named exports only. API area classes (`AccountApi`, `FinancesApi`, ...) stay
+classes, but endpoint methods are arrow-function properties so the method shape
+matches the exported-function style. Tool-loader config files may use
+`module.exports` only when the tool cannot load a named export (the two
+`vitest*.config.cts` files); do not use default exports.
 
 ```ts
 // chosen
 export const buildEndpointParams = (...): QueryParams | undefined => { ... };
-public getCustomPolicies = (...): Effect.Effect<Response, EbayApiError> => { ... };
+getCustomPolicies = (...): Effect.Effect<GetCustomPoliciesResponse, EbayApiError> => { ... };
 module.exports = vitestConfig; // only in CommonJS loader configs
 
 // not this
@@ -52,14 +55,11 @@ adapters, and CLI entrypoints. Do not add `try/catch` in endpoint or tool code.
 
 ```ts
 // chosen
-return Effect.tryPromise({
-  try: () => this.client.get<Response>(path, params),
-  catch: (cause) => new EbayApiError({ method: 'GET', path, cause }),
-});
+return requestGetEffect<GetCustomPoliciesResponse>(this.client, path, params);
 
 // not this
 try {
-  return await this.client.get<Response>(path, params);
+  return await this.client.get<GetCustomPoliciesResponse>(path, params);
 } catch (error) {
   throw new Error(`Failed: ${getErrorMessage(error)}`);
 }
@@ -71,13 +71,15 @@ converts them.
 ### Tagged Errors · [taste]
 
 Use Effect tagged errors such as `Data.TaggedError('EbayApiError')`. Endpoint
-methods should return typed Effects; `runApiRequest` is only for Promise-shaped
-call sites that are being migrated in the same ownership slice.
+methods return typed Effects that fail with `EbayApiError` (transport) or
+`EndpointInputError` (input), both from `src/api/shared/request.ts`; tools fail
+with `ToolInputError`. Client-level failures are `EbayClientRequestError` and
+`TradingApiFailure` under `src/api/client/`.
 
 ```ts
 // chosen
 export class EbayApiError extends Data.TaggedError('EbayApiError')<{
-  readonly method: 'GET';
+  readonly method: HttpMethod;
   readonly path: string;
   readonly cause: unknown;
 }> {}
@@ -142,35 +144,37 @@ export interface CustomPoliciesModel {
 _Why:_ The OpenAPI types are the contract; internal models are only for
 presentation boundaries.
 
-### Effect-Backed Schema Is The Tool Input SSOT · [taste]
+### Zod Schema Is The Tool Input SSOT · [taste]
 
-Endpoint/tool input schemas are authored through `@/utils/effectSchema.js`; that
-schema is the single source of truth. MCP tools derive `inputSchema` from
-`.shape`; `defineTool` decodes raw args through the attached Effect Schema before
-handlers run. Zod exists only as the MCP SDK / `zod-to-json-schema`
-compatibility carrier inside the adapter boundary. Do not import `zod` directly
-from endpoint, tool, API, or shared schema files. Runtime schema factories come
-from `@/utils/effectSchema.js`; schema inference/helper types come from
-`@/utils/effectSchemaTypes.js`. Do not add compatibility re-export facades or
-imported-as aliases just to preserve older import paths.
+Each endpoint/tool input is one Zod schema in `src/schemas/<family>/`; it is the
+single source of truth for the JSON Schema MCP clients see, runtime validation,
+and handler argument types. Import `z` from `zod` directly (`import type { z }`
+when a file only infers types). Describe every field with `.describe()`, derive
+related schemas with `.extend`/`.pick`, and keep input schemas free of async
+refinements. Tools pass `.shape`; `defineTool` runs `safeParse` and throws
+`ToolInputError` with `formatZodIssues` text. Endpoint methods that validate
+their own input decode it with `decodeEndpointInputEffect`, which fails with
+`EndpointInputError`. Infer input types with `z.infer<typeof schema>`. Do not
+add schema barrels, compatibility re-export facades, or a second validation
+library. See [src/schemas/README.md](src/schemas/README.md).
 
 ```ts
-// chosen
-import { z } from '@/utils/effectSchema.js';
+// chosen: src/schemas/account-management/account.ts
+export const getCustomPoliciesInputSchema = z.object({
+  policyTypes: z.string().optional().describe('Comma-delimited policy types (e.g., TAKE_BACK)'),
+});
 
-export const getCustomPoliciesInputSchema = z.object({ policyTypes: z.string().optional() });
+// src/tools/categories/account.ts
 inputSchema: getCustomPoliciesInputSchema.shape,
 handler: (api, args) => Effect.runPromise(api.account.getCustomPolicies(args)),
 
 // not this
-import { z } from 'zod';
-
 inputSchema: { policyTypes: z.string().optional() },
 handler: (api, args) => api.account.getCustomPolicies(args.policyTypes as string),
 ```
 
-_Why:_ One schema prevents schema/handler drift while keeping fallible runtime
-decode on Effect.
+_Why:_ One schema prevents schema/handler drift, and invalid input fails with a
+readable, typed error before any request is sent.
 
 ### Schema File Ownership · [taste]
 
@@ -178,15 +182,15 @@ decode on Effect.
 | --- | --- |
 | `src/tools/schemas.ts` | Shared primitives reused across families |
 | `src/schemas/<family>/` | Endpoint/tool input (and optional response) schemas for that family |
-| `src/types/**` | Generated eBay DTOs — regenerate with `pnpm run sync`; never hand-edit |
+| `src/types/**` | Generated eBay DTOs — regenerate with `pnpm sync`; never hand-edit |
 
 Do not add a third schema home. Family folder names need not match MCP keys
-one-to-one; see the map in [ARCHITECTURE.md](ARCHITECTURE.md#family-map-mcp-key--folders).
+one-to-one; the folder table is in [src/schemas/README.md](src/schemas/README.md#layout).
 
 ### Unified Params Builder · [taste]
 
 Endpoint methods own the allowed keys and wire names, then pass them to one
-shared params builder. The builder omits undefined/empty values and returns the
+shared params builder, `buildEndpointParams` in `src/api/shared/request.ts`. It omits undefined/empty values and returns the
 endpoint-specific params object. Do not hand-roll query strings or endpoint-local
 generic builders.
 
@@ -206,14 +210,18 @@ consistent.
 ### Request Adapter Boundary · [taste]
 
 Endpoint methods assemble only the endpoint path, body, and allowed params, then
-call the shared request adapter/client. The adapter owns HTTP execution, auth
+call the shared request adapter (`requestGetEffect`, `requestPostEffect`, ... in
+`src/api/shared/request.ts`) over `src/api/client/ebayApiClient.ts`. Those own HTTP execution, auth
 headers, logging, rate-limit metadata, JSON/XML parsing, and transport-error
 conversion.
 
 ```ts
 // chosen
-const path = `${this.basePath}/custom_policy/`;
-return requestGetEffect<GetCustomPoliciesResponse>(this.client, path, params);
+return requestGetEffect<GetCustomPoliciesResponse>(
+  this.client,
+  `${ACCOUNT_BASE_PATH}/custom_policy/`,
+  params,
+);
 
 // not this
 const response = await fetch(url);
@@ -276,6 +284,36 @@ const label = a ? b : c ? d : e;
 
 _Why:_ Endpoint and CLI code should be readable under pressure.
 
+### Domain Names · [test: tests/unit/bannedIdentifiers.test.ts]
+
+Name locals, parameters, and callbacks after what they hold. Do not use generic
+names such as `data`, `body`, `result`, `response`, `item`, `value`, `req`/`res`,
+`e`/`err`, or single letters; use `inventoryItem`, `orderPage`,
+`parsedArgs`, `handlerOutput`, `cause`, or `error`. HTTP handlers take
+`(request, response)`. Public tool input fields, eBay wire keys, exports, and
+the `(api, args)` handler contract keep their names.
+
+Never declare an identifier named `resolve` (variable, parameter, function,
+import). Name the callback after what it settles (`onServerReady`) or use an API
+that needs none: `once(server, 'listening')` from `node:events`, `setTimeout`
+from `node:timers/promises`, or `Effect.sleep`. Library members such as
+`path.resolve` and object keys such as Vite's `resolve:` option are allowed.
+`tests/unit/bannedIdentifiers.test.ts` fails on any declaration.
+
+```ts
+// chosen
+const parsedInput = schema.safeParse(input);
+await once(server, 'listening');
+new Promise((onServerReady, onServerError) => { ... });
+
+// not this
+const result = schema.safeParse(data);
+new Promise((resolve, reject) => { ... });
+```
+
+_Why:_ A name that says what a value is for makes code reviewable without
+tracing where it came from.
+
 ### Types And Interfaces · [taste]
 
 Use interfaces for public object contracts, type aliases for
@@ -303,10 +341,17 @@ _Why:_ Shared object contracts should be inspectable and stable.
 
 Use the `@/` alias for anything outside the current folder and `./sibling.js`
 only for same-directory imports. Keep NodeNext `.js` extensions. Hand-written
-source/test/UI file basenames must be camelCase. Do not use kebab-case or
-snake_case for hand-written file basenames. Generated files, upstream specs,
-external docs, and root convention files such as `CODE-STYLE.md` and `AGENTS.md`
-keep their upstream or conventional naming.
+source/test/MCP Apps file basenames must be camelCase and named after the file's
+main export: `ebayApiClient.ts` exports `EbayApiClient`, `ebaySellerApi.ts`
+exports `EbaySellerApi`, `tradingApiFailure.ts` exports `TradingApiFailure`.
+Do not use kebab-case or snake_case for hand-written file basenames. Generated
+files (`src/types/**`), upstream specs, external docs, and root convention files
+such as `CODE-STYLE.md` and `AGENTS.md` keep their upstream or conventional
+naming.
+
+API client plumbing (REST and Trading clients, their error types, the rate-limit
+tracker) lives under `src/api/client/`; the `EbaySellerApi` facade is
+`src/api/ebaySellerApi.ts`; endpoint areas live in `src/api/<family>/`.
 
 ```ts
 // chosen
@@ -317,10 +362,12 @@ import { helper } from './helper.js';
 import { getCustomPoliciesInputSchema } from '../../schemas/account-management/account.js';
 ```
 
-_Why:_ Imports and filenames should be predictable across `src`, tests, and UI.
+_Why:_ Imports and filenames should be predictable across `src`, tests, and
+`mcp-apps`; a file name tells you what to import from it.
 
-If a hand-written source/test/UI filename is introduced or found in kebab-case or
-snake_case, rename it in the same diff. This rule is about file basenames; domain
+If a hand-written source/test/MCP Apps filename is introduced or found in
+kebab-case or snake_case, or no longer matches its main export, rename it in the
+same diff. This rule is about file basenames; domain
 folder slugs and user-facing enum values such as the `token-management` tool
 family key are data contracts, not filenames.
 
@@ -353,8 +400,8 @@ _Why:_ stdout is the MCP protocol channel.
 ### Tool And Handler Shape · [taste]
 
 Tools stay co-located with handlers via `defineTool` by default.
-Endpoint-backed handlers validate/brand args, run exactly one endpoint Effect
-program, and do no `try/catch`, mapping, or response reshaping except
+Endpoint-backed handlers receive args already parsed by `defineTool`, run
+exactly one endpoint Effect program, and do no `try/catch`, mapping, or response reshaping except
 presentation-only UI maps. Protocol/helper tools that do not mirror an eBay
 endpoint (`search`, `fetch`, OAuth token helpers, and API status feed helpers)
 own their protocol response at that boundary; keep that shaping local, explicit,
@@ -368,10 +415,14 @@ _Why:_ Registry entries should make the tool-to-endpoint link obvious.
 
 ### UI Boundary · [taste]
 
-React entry files stay tiny archetype apps that render `ViewModel` shapes. eBay
-DTO projection lives in `src/tools/ui/maps.ts` as the presentation boundary, with
-inline object construction and no one-use row-builder helpers. Keep state local
-to each archetype unless two views genuinely share it.
+The React entry files in `mcp-apps/` (`table.tsx`, `card.tsx`, `chart.tsx`,
+`stat.tsx`) stay tiny archetype apps that render `ViewModel` shapes from
+`src/tools/ui/viewModels.ts`. eBay DTO projection lives in `src/tools/ui/maps.ts`
+as the presentation boundary, with inline object construction and no one-use
+row-builder helpers; a tool opts in with `ui: { archetype: 'table', map:
+mapOrdersToTable }` on its `defineTool` spec, and the map's input type is the
+handler's return type. Keep state local to each archetype unless two views
+genuinely share it.
 
 _Why:_ The UI layer owns only presentation, not API normalization.
 
@@ -389,7 +440,9 @@ _Why:_ MCP Apps code must stay type-checkable across the server/UI boundary.
 Use behavior names without `should` where practical. Keep unit tests under
 `tests/unit/<area>` and integration tests under `tests/integration`. Prefer
 focused inline fixtures for small DTOs; extract helpers only when they remove
-real duplication across tests.
+real duplication across tests. Repo-wide guards sit at the `tests/unit` root
+(`bannedIdentifiers.test.ts`, `advertisedToolCount.test.ts`,
+`forkDocs.test.ts`); fix the code or doc they flag rather than loosening them.
 
 _Why:_ Test names should read as behavior, not implementation instructions.
 
@@ -405,38 +458,56 @@ _Why:_ Tests should lock the contract, not prose.
 
 ### File And Module Size · [lint: complexity/noExcessiveLinesPerFunction]
 
-Split by purpose. Keep Biome size caps as warnings, not blind split triggers.
-Split when a file has multiple jobs, not because endpoint docs, schemas, or
-generated declarations are long.
+Split by purpose. Biome warns at 60 lines per function
+(`complexity/noExcessiveLinesPerFunction`) and 300 lines per file
+(`style/noExcessiveLinesPerFile`); both are off for `src/schemas/**`,
+`src/tools/categories/**`, `src/types/**`, and `src/scripts/**`. Treat the
+warnings as prompts, not blind split triggers: split when a file has multiple
+jobs, not because endpoint docs, schemas, or generated declarations are long.
 
 _Why:_ Locality beats shallow files.
 
 ### Formatting And Package Management · [lint: formatter]
 
 Biome owns formatting: 2 spaces, single quotes, semicolons, trailing commas, 100
-columns. Use `pnpm` for installs and lockfile changes. `npm run ...` remains
-acceptable for scripts because the repo documents npm-compatible scripts.
+columns. Use `pnpm` (pinned as `pnpm@10.14.0` in `package.json`) for installs,
+lockfile changes, and scripts; `pnpm fix` applies Biome fixes to `src` and
+`mcp-apps`.
 
 _Why:_ One lockfile keeps installs reproducible.
 
 ## Canonical Example
 
-The agreed style assembled on one endpoint slice. It is illustrative
-documentation, not a direct patch.
+The agreed style on one real endpoint slice, `ebay_get_custom_policies`, trimmed
+to the parts that matter. Each block names the file it lives in.
 
 ````ts
-import { Data, Effect } from 'effect';
-import { zodToJsonSchema } from 'zod-to-json-schema';
-import type { EbayApiClient } from '@/api/client.js';
-import type { QueryParams } from '@/api/shared/request.js';
-import { customPolicyResponseSchema } from '@/schemas/account-management/account.js';
-import type { OutputArgs } from '@/tools/types.js';
-import { defineTool } from '@/tools/defineTool.js';
-import type { components } from '@/types/sell-apps/account-management/sellAccountV1Oas3.js';
-import type { InferEffectSchema } from '@/utils/effectSchemaTypes.js';
-import { z } from '@/utils/effectSchema.js';
+// src/schemas/account-management/account.ts
+import { z } from 'zod';
 
-type GetCustomPoliciesInput = InferEffectSchema<typeof getCustomPoliciesInputSchema>;
+/**
+ * Validates the Account Management API get custom policies request payload.
+ */
+export const getCustomPoliciesInputSchema = z.object({
+  policyTypes: z
+    .string()
+    .optional()
+    .describe(
+      'Comma-delimited list of policy types to retrieve (e.g., PRODUCT_COMPLIANCE, TAKE_BACK)',
+    ),
+});
+
+// src/api/account-management/account.ts
+import type { EbayApiClient } from '@/api/client/ebayApiClient.js';
+import { buildEndpointParams, type EbayApiError, requestGetEffect } from '@/api/shared/request.js';
+import type { getCustomPoliciesInputSchema } from '@/schemas/account-management/account.js';
+import type { components } from '@/types/sell-apps/account-management/sellAccountV1Oas3.js';
+import type { Effect } from 'effect';
+import type { z } from 'zod';
+
+const ACCOUNT_BASE_PATH = '/sell/account/v1';
+
+type GetCustomPoliciesInput = z.infer<typeof getCustomPoliciesInputSchema>;
 
 /**
  * Response returned by eBay Account API getCustomPolicies.
@@ -445,63 +516,17 @@ type GetCustomPoliciesInput = InferEffectSchema<typeof getCustomPoliciesInputSch
  */
 export type GetCustomPoliciesResponse = components['schemas']['CustomPolicyResponse'];
 
-/** Input accepted by the MCP tool and Account API method for getCustomPolicies. */
-export const getCustomPoliciesInputSchema = z.object({
-  /** Comma-delimited custom policy types, e.g. PRODUCT_COMPLIANCE,TAKE_BACK. */
-  policyTypes: z.string().optional(),
-});
-
-/** API failure returned by endpoint Effects after the request adapter catches transport errors. */
-export class EbayApiError extends Data.TaggedError('EbayApiError')<{
-  readonly method: 'GET' | 'POST' | 'PUT' | 'DELETE';
-  readonly path: string;
-  readonly cause: unknown;
-}> {}
-
-/** One endpoint-owned query parameter allowed by the shared params builder. */
-export interface EndpointParamSpec {
-  /** Query-string key expected by eBay, usually snake_case from the OpenAPI spec. */
-  readonly wireName: string;
-  /** Already-typed local value; undefined and empty strings are omitted. */
-  readonly value: string | number | undefined;
-}
-
-/**
- * Builds query params from an endpoint-owned allow-list.
- *
- * @param params - Camel-case local parameter names mapped to their eBay wire names and values.
- * @returns A query object for the request adapter, or undefined when every value is omitted.
- *
- * @example
- * ```ts
- * const params = buildEndpointParams({
- *   policyTypes: { wireName: 'policy_types', value: input.policyTypes },
- * });
- * ```
- */
-export const buildEndpointParams = (
-  params: Record<string, EndpointParamSpec>,
-): QueryParams | undefined => {
-  const query: QueryParams = {};
-
-  for (const param of Object.values(params)) {
-    if (param.value !== undefined && param.value !== '') {
-      query[param.wireName] = param.value;
-    }
-  }
-
-  return Object.keys(query).length > 0 ? query : undefined;
-};
-
 export class AccountApi {
-  private readonly basePath = '/sell/account/v1';
+  private readonly client: EbayApiClient;
 
-  public constructor(private readonly client: EbayApiClient) {}
+  constructor(client: EbayApiClient) {
+    this.client = client;
+  }
 
   /**
    * Retrieves custom policies defined for the seller account.
    *
-   * @param input - Optional filter containing comma-delimited custom policy types.
+   * @param input - Optional custom policy type filter.
    * @returns An Effect that succeeds with eBay's generated CustomPolicyResponse.
    *
    * @example
@@ -513,22 +538,23 @@ export class AccountApi {
    *
    * @see https://developer.ebay.com/api-docs/sell/account/resources/custom_policy/methods/getCustomPolicies
    */
-  public getCustomPolicies = (
+  getCustomPolicies = (
     input: GetCustomPoliciesInput = {},
   ): Effect.Effect<GetCustomPoliciesResponse, EbayApiError> => {
-    const path = `${this.basePath}/custom_policy/`;
     const params = buildEndpointParams({
       policyTypes: { wireName: 'policy_types', value: input.policyTypes },
     });
 
-    return Effect.tryPromise({
-      try: () => this.client.get<GetCustomPoliciesResponse>(path, params),
-      catch: (cause) => new EbayApiError({ method: 'GET', path, cause }),
-    });
+    return requestGetEffect<GetCustomPoliciesResponse>(
+      this.client,
+      `${ACCOUNT_BASE_PATH}/custom_policy/`,
+      params,
+    );
   };
 }
 
-export const accountEntries = [
+// src/tools/categories/account.ts
+export const accountEntries: ToolEntry[] = [
   defineTool({
     name: 'ebay_get_custom_policies',
     description: 'Retrieve custom policies defined for the seller account',
@@ -537,35 +563,68 @@ export const accountEntries = [
       name: 'CustomPoliciesResponse',
       $refStrategy: 'none',
     }) as OutputArgs,
+    annotations: { readOnlyHint: true },
     handler: (api, args) => Effect.runPromise(api.account.getCustomPolicies(args)),
   }),
 ];
 ````
 
+When an endpoint method validates its own input (callers other than `defineTool`
+reach it), decode with the same schema inside `Effect.gen`, as
+`src/api/account-management/finances.ts` does:
+
+```ts
+public getPayout = (
+  input: GetPayoutInput,
+): Effect.Effect<PayoutResponse, EbayApiError | EndpointInputError> => {
+  const getFromApiz = this.getFromApiz;
+
+  return Effect.gen(function* () {
+    const { payoutId, marketplaceId } = yield* decodeEndpointInputEffect(
+      getPayoutInputSchema,
+      input,
+    );
+
+    return yield* getFromApiz<PayoutResponse>(
+      `${BASE_PATH}/payout/${encodeURIComponent(payoutId)}`,
+      undefined,
+      marketplaceId,
+    );
+  });
+};
+```
+
 ## Recipes
 
 ### Add An API Endpoint + MCP Tool
 
-1. Find the operation in `docs/sell-apps/**/<spec>.json` and copy the official
-   eBay docs URL for the method.
-2. Add or reuse an Effect-backed input schema from `@/utils/effectSchema.js`.
-   The tool derives `inputSchema` from `.shape`.
+1. Find the operation in the eBay OpenAPI spec (`pnpm sync` downloads the specs
+   listed in `src/scripts/specSources.ts` into `.cache/ebay-specs/`) and copy the
+   official eBay docs URL for the method.
+2. Add or reuse a Zod input schema in `src/schemas/<family>/`, with
+   `.describe()` on every field.
 3. Add generated response aliases from `src/types/**`, with `@see` when exported.
-4. Add the API method as an Effect-returning endpoint method with full TSDoc.
-5. Build query params through the shared params builder; do not hand-roll query
-   strings.
-6. Add a co-located `defineTool` entry whose handler runs the Effect at the MCP
-   boundary.
+4. Add the API method to the area class in `src/api/<family>/` as an
+   Effect-returning arrow property with full TSDoc; decode input with
+   `decodeEndpointInputEffect` when it needs runtime validation.
+5. Build query params with `buildEndpointParams`; do not hand-roll query strings.
+6. Add a `defineTool` entry in `src/tools/categories/<family>.ts` with
+   `inputSchema: schema.shape` and a handler that runs the Effect with
+   `Effect.runPromise`.
 7. Add unit tests for path/method/params/body and typed error tags; add
-   integration coverage when HTTP behavior changes.
-8. Run `npm run typecheck`, `npm run check:ci`, `npm test`, and relevant
-   integration tests.
+   integration coverage when HTTP behavior changes. A new tool changes the
+   advertised tool count, which `tests/unit/advertisedToolCount.test.ts` checks.
+8. Run `pnpm verify` (Biome CI, both typechecks, tests, build), plus
+   `pnpm test:integration` when HTTP behavior changed.
 
 ### Add Or Change A CLI Command
 
-1. Export one `run*({ argv, stdio })` function that contains the command journey.
-2. Route the bin through the hand-written router; do not add a CLI framework
-   unless a new ADR proves the need.
+1. Export one `run*` function that contains the command journey and accepts its
+   argv (see `runSkillsWizard` in `src/scripts/skills.ts`).
+2. Route the bin through the hand-written router in `src/index.ts`, and guard a
+   script's own entry with `isEntryModule(import.meta.url)` from
+   `src/utils/entryModule.ts`. Do not add a CLI framework unless a new ADR proves
+   the need.
 3. TTY with no flags may prompt. Flags or non-TTY must never hang.
 4. Machine-consumable commands add `--json` and stable exit codes.
 5. Human output may use stdout, color, prompts, and progress; MCP STDIO mode may
@@ -575,20 +634,24 @@ export const accountEntries = [
 
 1. Return generated eBay DTOs from the API layer.
 2. Map to `TableViewModel`, `CardViewModel`, `ChartViewModel`, or `StatViewModel`
-   only at `src/tools/ui/maps.ts`.
+   only in `src/tools/ui/maps.ts`, and attach the map with `ui: { archetype, map }`
+   on the tool's `defineTool` spec.
 3. Keep object construction inline in the mapper that owns the target shape.
 4. Use `null`/empty values for missing display data and let the React view render
    the placeholder.
+5. Run `pnpm typecheck:mcp-apps` and `pnpm build:mcp-apps` when `mcp-apps/`
+   changes.
 
 ## Exemplars
 
-Current files are temporary exemplars until the Effect migration creates a full
-API exemplar:
-
-- `src/tools/defineTool.ts` - typed `defineTool`, Effect schema SSOT, and useful
-  boundary comments.
-- `ui/host.tsx` - concise TSDoc around a real trust boundary and small reusable
-  UI primitives.
+- `src/tools/defineTool.ts` - typed `defineTool`, Zod parse at the boundary, and
+  useful boundary comments.
+- `src/schemas/account-management/finances.ts` and
+  `src/api/account-management/finances.ts` - described Zod fields, small
+  domain-named schema builders, and endpoint methods that decode input with
+  `decodeEndpointInputEffect`.
+- `mcp-apps/host.tsx` - concise TSDoc around a real trust boundary and small
+  reusable UI primitives.
 - `tests/unit/tools/uiMaps.test.ts` - behavior-named tests and focused inline
   fixtures.
 
@@ -596,10 +659,13 @@ API exemplar:
 
 - Never use `as any`; narrow or use a documented boundary cast.
 - Never add default exports.
-- Never add or keep kebab-case or snake_case hand-written source/test/UI file
-  basenames.
+- Never add or keep kebab-case or snake_case hand-written source/test/MCP Apps
+  file basenames, or a file name that does not match its main export.
+- Never declare an identifier named `resolve`, or name a local `data`, `result`,
+  `item`, `value`, `e`, or a single letter when a domain name exists.
+- Never validate tool or endpoint input with anything but the family's Zod schema.
 - Never use `try/catch` in endpoint/tool code when the work can be an Effect.
-- Never throw custom untagged errors from migrated API code.
+- Never throw custom untagged errors from API code.
 - Never use `?? 'unknown'`, `?? 'N/A'`, or invented semantic display fallbacks in
   maps.
 - Never extract one-use `toXRow`/`buildXModel` helpers that only hide object
