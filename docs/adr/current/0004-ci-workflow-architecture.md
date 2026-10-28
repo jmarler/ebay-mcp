@@ -11,6 +11,13 @@
 > label (patch otherwise), names the release after the PR title, tags the version
 > without a bump commit, and dispatches `publish.yml`.
 > Current gate commands: [AGENTS.md](../../../AGENTS.md).
+>
+> **Status update (2026-10-27):** Superseded in part by upstream #193, #204 and #206
+> (v2.0.x). `biome.yml`, `typecheck.yml`, `test.yml` and `build.yml` are gone: lint and
+> both typechecks moved to the `.husky/pre-push` hook, and `ci.yml` runs unit (with the
+> coverage gate) and integration tests plus the build on Linux only. On pull requests it
+> tests only files changed since the base commit, unless lockfile, config or workflow
+> files changed. The single **CI Gate** status check remains.
 
 ## Context
 

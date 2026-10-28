@@ -165,6 +165,10 @@ These credentials are obtained from the [eBay Developer Portal](https://develope
 
 Log level (default `info`) and opt-in file logging to `~/.ebay-mcp/logs/`. Logs always go to stderr so they never corrupt the STDIO protocol. See [Logging](../logging.md).
 
+#### `EBAY_SIGNING_KEY_JWE` / `EBAY_SIGNING_PRIVATE_KEY`
+
+Optional [Digital Signatures](https://developer.ebay.com/develop/guides/digital-signatures-for-apis) credentials, required by eBay only for EU- and UK-domiciled sellers on Finances API calls and `issueRefund`. Set them to the `jwe` and `privateKey` from `ebay_create_signing_key` (base64 PKCS#8 or PEM). With both unset nothing is signed; with only one set the server warns at startup. See the README's "Digital signatures" section.
+
 ### HTTP transport / container deploy (optional)
 
 These variables apply when running the HTTP MCP server (`node build/serverHttp.js`). In this fork the Docker image defaults to the STDIO entrypoint (`build/index.js`) for Claude Desktop; run the image with `node build/serverHttp.js` to serve HTTP, as `scripts/dockerUp.sh` does.

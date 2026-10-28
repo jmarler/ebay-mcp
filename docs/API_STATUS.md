@@ -9,7 +9,7 @@ This page used to hold a committed snapshot of the eBay API Status RSS feed, wri
 
 ## Endpoint coverage
 
-The server exposes **384 tools across 360 endpoints** (see the `package.json` description; `tests/unit/advertisedToolCount.test.ts` pins the advertised count to the tool registry).
+The server exposes **379 tools across 356 endpoints** (see the `package.json` description; `tests/unit/advertisedToolCount.test.ts` pins the advertised count to the tool registry).
 
 Coverage against eBay's OpenAPI specs comes from `pnpm sync` (`src/scripts/devSync.ts`):
 
@@ -34,6 +34,6 @@ REST APIs with OpenAPI specs (tracked by `pnpm sync`, see [sell-apps/README.md](
 - **Order management:** Fulfillment, Logistics
 - **Marketing and promotions:** Marketing, Recommendation
 - **Analytics:** Analytics
-- **Other:** Translation, Compliance, Identity, eDelivery International Shipping, VeRO
+- **Other:** Translation, Identity, eDelivery International Shipping, VeRO
 
 Also exposed, outside the spec sync: the Trading API (XML) and Browse (`trading` and `browse` tool families in `src/config/toolFamilies.ts`).

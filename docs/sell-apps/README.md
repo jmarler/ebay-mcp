@@ -66,7 +66,6 @@ keep this page in step.
 ### Other Selling APIs
 
 - **Translation API**: [Overview](https://developer.ebay.com/api-docs/master/commerce/translation/openapi/3/commerce_translation_v1_beta_oas3.json)
-- **Compliance API**: [Overview](https://developer.ebay.com/api-docs/master/sell/compliance/openapi/3/sell_compliance_v1_oas3.json)
 - **Identity API**: [Overview](https://developer.ebay.com/api-docs/master/commerce/identity/openapi/3/commerce_identity_v1_oas3.json)
 - **eDelivery International Shipping API**: [Overview](https://developer.ebay.com/api-docs/master/sell/edelivery_international_shipping/openapi/3/sell_edelivery_international_shipping_oas3.json)
 - **Vero API**: [Overview](https://developer.ebay.com/api-docs/master/commerce/vero/openapi/3/commerce_vero_v1_oas3.json)

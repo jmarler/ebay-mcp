@@ -4,7 +4,7 @@ Guidance for coding agents (and humans) working **on** this repo. For using the 
 
 ## What this is
 
-A local [MCP](https://modelcontextprotocol.io) server exposing 384 tools across 360 endpoints — 100% of eBay's Sell APIs. TypeScript/Node.js (ESM), built with `@modelcontextprotocol/sdk`, Zod input schemas, Effect for async work and typed errors, and OpenAPI-generated types.
+A local [MCP](https://modelcontextprotocol.io) server exposing 379 tools across 356 endpoints — 100% of the eBay Sell, Commerce and Developer APIs it tracks. TypeScript/Node.js (ESM), built with `@modelcontextprotocol/sdk`, Zod input schemas, Effect for async work and typed errors, and OpenAPI-generated types.
 
 - **Entry points:** `src/index.ts` (STDIO transport — default; also routes the `setup` / `skills` / `diagnose` subcommands) and `src/serverHttp.ts` (HTTP transport).
 - **Runtime:** Node.js ≥ 20. Package manager: pnpm (`pnpm@10.14.0`); `npm run <script>` works too.
@@ -37,8 +37,9 @@ pnpm build              # tsc + tsc-alias + MCP Apps bundle → build/     — m
 except `test:integration`). `pnpm check` (`npm run check`) is the quick local pass: both
 typechecks plus `biome check` over `src/` and `mcp-apps/`.
 
-CI runs these behind one **CI Gate** status check (`ci.yml` composing `biome.yml`,
-`typecheck.yml`, `test.yml`, `build.yml`) — see
+Since v2.0, lint and typecheck run locally in the `.husky/pre-push` hook (all six commands
+above except `test:integration`); `ci.yml` runs only tests and the build on Linux, behind one
+**CI Gate** status check, and on pull requests tests only the changed files — see
 [docs/adr/current/0004-ci-workflow-architecture.md](docs/adr/current/0004-ci-workflow-architecture.md)
 and its status note.
 
@@ -78,7 +79,7 @@ Outside `src/`: `mcp-apps/` (React MCP Apps views, built into `build/ui/`), `tes
 
 1. `pnpm sync` — downloads the specs listed in `src/scripts/specSources.ts` (cached in `.cache/ebay-specs/`), regenerates `src/types/`, and reports missing endpoints (full list in `devSyncReport.json`, gitignored).
 2. Write the Zod input schema in `src/schemas/<family>/` (`import { z } from 'zod'`, `.describe()` every field) — rules in [src/schemas/README.md](src/schemas/README.md).
-3. Add the Effect-returning method to the area class in `src/api/<area>/`, decoding input with `decodeEndpointInputEffect` and calling the request helpers in `src/api/shared/request.ts`. A new area is exposed through `src/api/ebaySellerApi.ts`.
+3. Add the Effect-returning method, named after the spec's exact `operationId`, to the area class in `src/api/<area>/`, decoding input with `decodeEndpointInputEffect` and calling the request helpers in `src/api/shared/request.ts`. A new area is exposed through `src/api/ebaySellerApi.ts`.
 4. Add a `defineTool({ ..., inputSchema: <schema>.shape, handler })` entry in `src/tools/categories/<family>.ts`; the handler runs the endpoint Effect with `Effect.runPromise`. `registry.ts` derives everything from `src/tools/categories/index.ts`; a new family also needs its key in `src/config/toolFamilies.ts` (a unit test keeps the two in sync).
 5. Add tests in `tests/`. A new tool changes the advertised count: update it in `package.json`, `README.md`, and `llms.txt` (`tests/unit/advertisedToolCount.test.ts` fails until they match).
 6. Run the validation commands above.

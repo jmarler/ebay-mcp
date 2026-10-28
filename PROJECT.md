@@ -25,7 +25,7 @@ and analyse on eBay without bespoke integration code.
 
 ## What it does
 
-- Exposes **384 tools across 360 endpoints** (100% of the Sell surface) over MCP,
+- Exposes **379 tools across 356 endpoints** (100% of the tracked Sell, Commerce and Developer APIs) over MCP,
   including the Finances, Feed, Stores, Logistics, Account v2, and Metadata
   shipping APIs added in v1.18.
 - Handles **OAuth** (setup wizard, refresh-token flow, JWT verification).
@@ -49,9 +49,10 @@ and analyse on eBay without bespoke integration code.
   workflow (and the scheduled `api-sync.yml` run, which opens an issue listing
   unexposed endpoints) exists to catch drift.
 - **Keep agent context lean** — dynamic tool gating is the lever; grow it rather
-  than exposing all 384 tools by default.
-- **Keep the contributor gate honest** — one CI Gate (Biome + typecheck of `src/`
-  and `mcp-apps/` + unit/integration tests + build across an OS×Node matrix), with
+  than exposing all 379 tools by default.
+- **Keep the contributor gate honest** — Biome + typecheck of `src/` and
+  `mcp-apps/` in the pre-push hook, and one CI Gate (unit/integration tests + build
+  on Linux), with
   readable Zod validation errors so agents can fix their own bad input.
 - **Keep the CLI hand-router lean** — a framework (commander) was evaluated and
   dropped as unused; add one only when a real need justifies the dependency

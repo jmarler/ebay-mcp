@@ -9,12 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 This is the `marlermedia` fork of [YosefHayim/ebay-mcp](https://github.com/YosefHayim/ebay-mcp).
 `main` mirrors upstream exactly; the `marlermedia` branch carries the changes below on top of
-the latest upstream release (currently v1.18.3) and is re-applied on each upstream catch-up.
+the latest upstream release (currently v2.0.3) and is re-applied on each upstream catch-up.
 Upstream no longer keeps a changelog (each merged PR is tagged as a release by `release.yml`), so the fork
 records both its own changes and an upstream summary here.
 
 Fork changes, newest first:
 
+- **2026-10-27** — Caught up to upstream v2.0.3. No fork code changed; the restored docs were
+  refreshed for the new tool counts, removed tools, CI layout and Digital Signatures settings.
 - **2026-10-12** — Restore the contributor and agent docs upstream deleted in #186 (root
   markdown files and `docs/`), updated to the current code, and guard them with
   `tests/unit/forkDocs.test.ts`, which fails on links to missing files, stale backticked repo
@@ -48,6 +50,39 @@ Fork changes, newest first:
   - Analytics traffic-report guidance: `sort` must be a metric, never a dimension.
   - Inventory generated body schemas advertise `type: object`, so MCP hosts send bodies as
     objects rather than JSON strings eBay rejects.
+
+## 2.0.3 / 2.0.0 (upstream)
+
+Upstream changes since v1.18.3, summarised from `git log v1.18.3..v2.0.3`.
+
+### Breaking
+
+- **Removed tools for decommissioned eBay endpoints** (2.0.0, #198, #202): the Sell Compliance
+  API (`ebay_get_listing_violations`, `ebay_get_listing_violations_summary`), the Marketing
+  campaign methods `ebay_setup_quick_campaign` and `ebay_launch_campaign`, and
+  `ebay_find_completed_items` (Finding API). There is no sold-listings replacement short of the
+  Marketplace Insights API, which needs eBay approval.
+- **API methods are named after eBay's exact operationIds** (#200), with every spec refreshed.
+  Tool names did not change.
+- Coverage: **379 tools across 356 endpoints**.
+
+### Features
+
+- **Digital Signatures** (#191): Finances calls and `issueRefund` are signed (RFC 9421) when
+  `EBAY_SIGNING_KEY_JWE` and `EBAY_SIGNING_PRIVATE_KEY` are set; eBay requires this for EU/UK
+  sellers. Key Management tools now call `apiz.ebay.com` with an application token.
+
+### Fixes
+
+- Disputes, eDelivery, Translation and client registration call the hosts and base paths eBay
+  actually serves (#199).
+- `pnpm sync` keeps cached specs when a download is bad and regenerating unchanged types is a
+  no-op (#196); vulnerable dependencies patched (#194); coverage thresholds enforced (#197).
+
+### CI
+
+- Lint and typecheck moved to the pre-push hook; CI runs tests and build on Linux only, and
+  only changed files' tests on pull requests (#193, #204, #206).
 
 ## 1.18.3 / 1.18.0 (upstream)
 

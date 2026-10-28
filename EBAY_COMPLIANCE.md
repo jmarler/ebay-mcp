@@ -89,7 +89,7 @@ The project properly integrates with eBay's Developer Program:
    - Rate limit error handling
 
 4. **API Coverage**
-   - 384 tools across 360 endpoints, covering eBay's Sell APIs
+   - 379 tools across 356 endpoints, covering eBay's Sell, Commerce and Developer APIs
    - Follows eBay API specifications
    - OpenAPI-generated types for accuracy (`pnpm sync`, see [docs/API_STATUS.md](docs/API_STATUS.md))
 
