@@ -194,7 +194,7 @@ These variables apply when running the HTTP MCP server (`node build/serverHttp.j
 
 #### `OAUTH_ENABLED` and the `OAUTH_*` verifier settings
 
-Without `MCP_AUTH_TOKEN`, HTTP routes require an OAuth 2.1 bearer token checked against `OAUTH_AUTH_SERVER_URL` (with `OAUTH_CLIENT_ID`, `OAUTH_CLIENT_SECRET`, `OAUTH_REQUIRED_SCOPES`, `OAUTH_USE_INTROSPECTION`). `OAUTH_ENABLED=false` turns that check off — only safe when the port is bound to loopback, as `scripts/dockerUp.sh` does (`-p 127.0.0.1:3000:3000`).
+Without `MCP_AUTH_TOKEN`, HTTP routes require an OAuth 2.1 bearer token checked against `OAUTH_AUTH_SERVER_URL` (with `OAUTH_CLIENT_ID`, `OAUTH_CLIENT_SECRET`, `OAUTH_REQUIRED_SCOPES`, `OAUTH_USE_INTROSPECTION`). `OAUTH_ENABLED=false` turns that check off — only safe when the port is bound to loopback or `MCP_AUTH_TOKEN` is set, as `scripts/dockerUp.sh` does when it publishes the port to the LAN.
 
 ### Required: User Refresh Token (For OAuth Flow)
 

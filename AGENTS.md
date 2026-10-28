@@ -125,7 +125,7 @@ This clone is jmarler's fork of `YosefHayim/ebay-mcp` (remotes: `origin` = upstr
   - Order table/card MCP Apps views show eBay fees.
   - Token write-back skips a `.env` that is not a regular file (`src/auth/credentialSession.ts`).
   - `Dockerfile` pins pnpm 10.14.0 and defaults `CMD` to STDIO (`build/index.js`).
-- **Local Docker container:** `scripts/dockerUp.sh` recreates the `ebay-mcp` HTTP container (`node build/serverHttp.js` on `127.0.0.1:3000`) with credentials resolved from 1Password by `op run` using the references in `scripts/opSecrets.env` (no secrets in the repo). Build the image first with `docker build -t ebay-mcp:latest .`.
+- **Local Docker container:** `scripts/dockerUp.sh` recreates the `ebay-mcp` HTTP container (`node build/serverHttp.js` on port 3000 of every host interface, so the LAN can reach it; `EBAY_MCP_BIND=127.0.0.1` keeps it local) with credentials resolved from 1Password by `op run` using the references in `scripts/opSecrets.env` (no secrets in the repo). Requests must carry `Authorization: Bearer <MCP_AUTH_TOKEN>` (the "MCP Auth Token" field of the 1Password item). Build the image first with `docker build -t ebay-mcp:latest .`.
 
 ## Agent skills
 
